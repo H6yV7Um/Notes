@@ -1,0 +1,103 @@
+##+HTML_HEAD: <link href="http://thomasf.github.io/solarized-css/solarized-dark.css" rel="stylesheet" type="text/css">
+#+HTML_HEAD: <link href="http://norang.ca/norang.css" rel="stylesheet" type="text/css">
+#+HTML_HEAD: <link href="css/bootstrap.min.css" rel="stylesheet" media="screen">
+#+HTML_HEAD: <link href="css/bootstrap-responsive.min.css" rel="stylesheet">
+#+OPTIONS: email:t
+#+LINK_HOME: index.html
+#+TITLE: US2 of EC\_GSM
+#+AUTHOR: Howard Hou
+#+EMAIL: howard.hou@ericsson.com
+
+* TS Configure
+#+begin_src c
+// have not update as below
+CO_TS_Config_s.bs_pa_mfrms = 2;
+CO_TS_Config_s.bs_ag_blks_res = 0;
+CO_TS_Config_s.ext_range = 0;
+#+end_src
+
+* TS Enable
+** LIB
+*** tfs\_stddef.h
+#+begin_src c
+typedef enum         /* HR */
+{
+  bm, lm, bm_vsc1, lm_vsc1, sdcch_4, sdcch_8, bcch, ccch_dnl, cbch_sdcch_4,cbch_sdcch_8, pdch, 
+  ec_bcch, ec_ccch_upl, ec_ccch_dnl // delete ec_ccch_upl, ec_ccch_dn?
+} chan_group_enum;
+
+const uint_8 EC_BCCH  = 5;   /*EC_GSM*/   // delete?
+const uint_8 EC_CCCH  = 6;   /*EC_GSM*/   // delete?
+const uint_8 EC_SCH   = 7;   /*EC_GSM*/
+#+end_src
+*** t\_tsam\_lib.cc 
++ in get\_chan\_no():
+#+BEGIN_SRC C
+ case ec_bcch:
+    chan_no = 0xe0 | tn;
+    break;
+
+  case ec_ccch_upl:  // delete?
+    chan_no = 0xc8 | tn;
+    break;
+
+  case ec_ccch_dnl: //delete?
+    chan_no = 0xd0 | tn;
+    break;
+#+end_src
+
+** TSA
+#+begin_src c
+// defined beyond OS_PROCESS(CO_TS), correct?
+objectReference server_obj_ts0 = 0xffffffff; 
+uint_8  coId_ts1 = 0xff;
+#+end_src
+
+*** handleCO\_Enable()
+check\_CbchInd\_BsAgBlksRes() // update?
+
+*** handle\_cch\_connect()
+#+begin_src c
+    set_rsl_proc_id(get_chan_no(chan_group, 0, 
+				tsData[CoId].tn),
+		    rec_p -> t_cch_connect_cfm.cch_pid);
+    
+    if ((chan_group == bcch) || (chan_group == ec_bcch)) /* CCCH has the same process ID as BCCH  */
+    {
+      set_rsl_proc_id(get_chan_no(ccch_dnl, 0, // For ec_bcch, should it be ec_ccch_dnl? same question for handle_cch_disconnect()
+				  tsData[CoId].tn),
+		      rec_p -> t_cch_connect_cfm.cch_pid);
+    }
+#+end_src
+
+** PCC
+*** enable()
++ get\_config() is not updated.
++ in enable()
+#+begin_src c
+	if ((idle_pos_fill(ep->atsr) == TRUE) && 
+	    (ch_comb != CHAN_COMB_IV) && 
+	    (ch_comb != CHAN_COMB_VI))  // update ?
+	{
+	  idle_burst_ctrl (ep->tn, TRUE);
+	}
+#+end_src
+
+*** t\_pcs\_main.h
+#+begin_src c
+// who are they for? Especially for CCCH_ec and BCCH_ec, they are not included in cc_ec_table[] in t_pcs_main.cc
+#define CCCH_ec      0   
+#define BCCH_ec      1
+#define SCH_ec       2
+#define RACH_ec      0
+#+end_src
+
+** CCH
++ que\_store\_conf\_data() // update?
+
+
+---------
+
+
+
+

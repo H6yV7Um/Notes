@@ -1,0 +1,161 @@
+#+HTML_HEAD: <link rel="stylesheet" type="text/css" href="css/norang.css" />
+##+STYLE: <link rel="stylesheet" type="text/css" href="css/worg-zenburn.css" />
+#+OPTIONS: email:t
+#+LINK_HOME: ../public_html/sitemap.html
+#+TITLE: Cygwin平台创建octopress博客
+#+AUTHOR: Howard Hou
+#+EMAIL: howard.hou@ericsson.com
+
+* cygwin平台安装git
+** 安装git
+打开安装cygwin时的setup.exe，在搜索框中输入git，然后选择相关的软件，如，
+
+- git， git-gui， git-svn， gitk， stgit
+- git-completion：Git命令的自动补齐功能
+- openssh：SSH客户端，因有些git仓库是需要SSH服务访问的
+- vim: Git的默认编辑器
+
+** 忽略文件权限的可执行位
+默认，git会跟踪文件的可执行位，但对windows平台而言，这是没用的，甚而是有害的，因为windows平台的其他软件或操作可能会破坏文件的可执行位。
+
+可通过命令禁止git对文件权限的跟踪。
+
+=git config --system core.fileMode false=
+
+这样，已添加到库中的文件的权限在本地改变时，git不会更新库中的相应文件。
+** 对中文的支持
+版本1.7.x后的Cygwin能很好的支持中文（用locale命令可查看支持的字符），但msysgit的shell环境仍然需要相关的配置。 
+同linux平台一样，文件名称中包含中文的文件，在工作区状态输出时，中文文件名不能正常显示，而是用八进制字符显示的，为了解决此问题，可执行
+
+=git config --global core.quotepath false=
+** SSH服务
+以公钥认证的方式访问Git服务器，是实现Git写操作的最重要的服务。 
+
+使用如下命令来生成SSH公钥、私钥对：
+
+=$ssh-keygen –C “emailAddress” –t rsa=
+
+上述命令执行中，一路选择回车，会生成/home/Administrator/.ssh/。 
+但是，cygwin下的openssh有一个bug： 使用git克隆来自SSH协议版本库时，偶尔会中断,致使克隆失败。解决办法是，使用plink，具体如下：
+*** 安装putty
+putty是windows下的开源软件，提供SSH客户端服务，还包括管理公钥的相关工具。
+
+下面几个包含在安装目录中的程序，用于与Git整合， 
+- plink.exe，命令行的SSH客户端，用于替代ssh命令。 
+- puttygen，管理putty格式的私钥，也可用于将openssh的私钥转换为putty格式的私钥。 
+- pageant， ssh认证代理，运行于后台，负责为ssh连接提供私钥访问服务。
+*** 密钥转换
+将openssh格式的私钥转换为putty格式的私钥。 
+打开puttygen，加载/home/Administrator/.ssh/id\_rsa,会有窗口弹出转换成功的提示，在关闭提示回到puttygen界面后，选择保存私钥，起名为 id\_rsa.ppk，保存在/home/Administrator/.ssh中。
+*** 设置plink为SSH服务器的客户端
+创建脚本文件/bin/ssh-client-plink，内容为：
+#+begin_src sh
+#!/bin/sh
+/cygwin/c/Program \Files \(x86)/PuTTY/plink.exe –T –i C:/cygwin/home/Administrator/.ssh/id_rsa.ppk $*
+#+end_src
+当git访问ssh服务器时，为使上述脚本被自动调用，执行：=export GIT_SSH=/bin/ssh-client-plink=
+*** 测试
+#+begin_src sh
+$ssh –T git@github.com
+Hi usernameOngithub! You’ve successfully authenticated…..
+#+end_src
+注意，测试之前应将公钥复制到个人github网页的SSH KEYS中，详细见后。
+* 配置个人github账户
+** 创建github账户
+为方便后面的使用，用户名假设为githubUsername。
+** 添加公钥
+添加的路径是：setting->SSH Keys, 方法是将上面生成的/home/Administrator/.ssh/id\_rsa.pub文件的内容复制到新增加的key中。
+** 添加Email Address
+添加的路径是：setting->Emails。 
+一定要验证该邮箱，否则，在新增加一个博文后，尽管 =$rake preview= 可以更新网址localhost:4000，但是， =$rake gen_deploy= 将不能更新USENAME.GITHUB.COM。
+
+* OCTOPRESS
+** 下载OCTOPRESS源码
+#+BEGIN_SRC SH
+$CD /HOME/ADMINISTRATOR
+$GIT CLONE GIT://GITHUB.COM/IMATHIS/OCTOPRESS.GIT OCTOPRESS
+#+END_SRC
+** 安装BUNDLER
+#+BEGIN_SRC SH
+$CD ./OCTOPRESS
+$GEM INSTALL BUNDLER
+#+END_SRC
+** 安装OCTOPRESS依赖的RUBY-GEMS
+=$BUNDLE INSTALL= 安装GEMFILE文件中列出的RUBY-GEMS。
+遇到错误：AN ERROR OCCURRED WHILE INSTALLING POSIX-SPAWN (0.3.6), AND BUNDLER CANNOT CONTINUE。
+
+解决办法，
+#+BEGIN_SRC SH
+$GEM INSTALL RAKE-COMPILER -V 0.7.6
+$GIT CLONE GIT://GITHUB.COM/RTOMAYKO/POSIX-SPAWN.GIT
+$CD POSIX-SPAWN/
+$RAKE GEM
+$GEM INSTAL PKG/POSIX-SPAWN-0.3.6
+$BUNDLE INSTALL
+#+END_SRC
+** 安装OCTOPRESS默认的主题
+=$RAKE INSTALL=
+
+该命令将OCTOPRESS/.THEMES/SOURCE和OCTOPRESS/.THEMES/SASS复制到OCTOPRESS目录下。 
+注意，该命令应在目录./OCTOPRESS中执行。
+* 创建GITBUB博客
+** 在GITHUB个人账户里创建REPOS
+该REPOS名为：GITHUBUSERNAME.GITHUB.COM。
+** =$RAKE SETUP_GITHUB_PAGES= 
+键入该命令后，按提示输入GIT@GITHUB.COM:GITHUBUSERNAME/ GITHUBUSERNAME.GITHUB.COM.GIT。 
+
+该命令将建立两个BRANCH，分别是MASTER和SOURCE。MASTER用来发布OCTOPRESS生成的静态文件（DEPLOY文件夹中的静态文件）；SOURCE用来发布除了DEPLOY之外的所有文件，即OCTOPRESS程序本身。
+** =$RAKE GEN_DEPLOY=
+
+该命令是下面命令的合写。其中，
+
+=$RAKE GENERATE= 会使用/SOURCE, OCTOPRESS/SASS生成OCTOPRESS/PUBLIC。
+=$RAKE DEPLOY= 是将OCTOPRESS/PUBLIC的内容提交到OCTOPRESS/\_DEPLOY这个数据仓库，对BLOG进行版本控制。
+** 打开博客
+网址为 GITHUBUSERNAME.GITHUB.COM。
+** 将所有源文件发布到SOURCE分支
+在这之前，OCTOPRESS/SOURCE，OCTOPRESS/SASS是不在OCTOPRESS/.GIT的管理下的。
+
+- =$GIT ADD .=
+- =$GIT COMMIT -M "INITIAL SOURCE COMMIT"=
+- $GIT PUSH ORIGIN SOURCE=
+  - 错误 
+  ERROR: REPOSITORY NOT FOUND. 
+  FATAL: THE REMOTE END HUNG UP UNEXPECTEDLY
+  - 解决办法
+  在文件.GIT/CONFIG中，删除以下内容： 
+  #+BEGIN_SRC SH
+  [REMOTE “ORIGIN”]
+  URL = GIT@GITHUB.COM:USERNAME/USERNAME.GITHUB.COM 
+  FETCH = +REFS/HEADS/:REFS/REMOTES/ORIGIN/
+  #+END_SRC
+  - =$GIT REMOTE ADD ORIGIN= 
+  - =GIT@GITHUB.COM:GITHUBUSERNAME/GITHUBUSERNAME.GITHUB.GIT=
+  - =$GIT PUSH -U ORIGIN SOURCE=
+* 重建博客
+删除原有的OCTOPRESS =$RM -RF ./OCTOPRESS=
+
+克隆MASTER分支 =$GIT CLONE GIT@GITHUB.COM:GITHUBUSERNAME/GITHUBUSERNAME.GITHUB.GIT=
+
+查看本地分支
+#+BEGIN_SRC SH
+$CD GITHUBUSERNAME.GITHUB.COM
+$GIT BRANCH
+* MASTER
+#+END_SRC
+
+切换分支  =$GIT CHECKOUT SOURCE=
+
+再次查看本地分支
+#+BEGIN_SRC GIT
+$GIT BRANCH
+MASTER
+\* SOURCE
+#+END_SRC
+本地分支已切换为SOURCE。
+
+克隆SOURCE分支
+#+BEGIN_SRC GIT
+$git clone git@github.com:githubUsername/githubUsername.github.com.git
+$mv githubUsername.github.com _deploy
+#+end_src 

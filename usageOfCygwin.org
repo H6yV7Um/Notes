@@ -1,0 +1,43 @@
+#+HTML_HEAD: <link rel="stylesheet" type="text/css" href="css/norang.css" />
+##+STYLE: <link rel="stylesheet" type="text/css" href="css/worg-zenburn.css" />
+#+OPTIONS: email:t
+#+LINK_HOME: ../public_html/sitemap.html
+#+TITLE: Cygwin的使用
+#+AUTHOR: Howard Hou
+#+EMAIL: howard.hou@ericsson.com
+
+* cygwin下访问windows盘符
+** 查看windows盘符在cygwin下的映射
+#+begin_src sh
+$ mount
+C:/cygwin/bin on /usr/bin type ntfs (binary,auto)
+C:/cygwin/lib on /usr/lib type ntfs (binary,auto)
+C:/cygwin on / type ntfs (binary,auto)
+C: on /cygdrive/c type ntfs (binary,posix=0,user,noumount,auto)
+D: on /cygdrive/d type ntfs (binary,posix=0,user,noumount,auto)
+E: on /cygdrive/e type ntfs (binary,posix=0,user,noumount,auto)  
+#+end_src
+** cygpath命令的使用
+#+begin_src sh
+$ cygpath -u c:\\Windows
+/cygdrive/c/Windows
+$ cygpath -w /cygdrive/c/Windows
+C:\Windows
+#+end_src
+* cygwin中用户主目录不一致问题
+** 问题描述
+如果其他软件(如msysGit)为windows设置了HOME环境变量, 会影响到Cygwin中用户主目录的设置, 甚至会造成在Cygwin中的不同命令有不同的用户主目录的情况。
+
+cygwin确定用户主目录的依据是，先查看系统的HOME环境变量, 再查看/etc/passwd中为用户设置的主目录. 而有些cygwin应用(如SSH)却没有先查看HOME环境变量, 而是直接使用/etc/passwd中设置的用户主目录.
+** 解决办法
+不要让其他软件设置的HOME环境变量影响cygwin, 在C:\cygwin\Cygwin.bat的开头添加 set HOME=
+* 命令行自动补齐忽略文件名大小写
+windows的文件系统是忽略文件名的大小写的。
+
+为使用方便，最好让cygwin的命令行补齐功能也忽略大小写。编辑文件~/.inputrc，删除掉 #set completion-ignore-case on其中的 #，再重新进入cygwin。
+* 安装新软件git
+重新打开安装cygwin时的setup.exe。在搜索框中输入git，然后选择相关的软件，如，
+- git， git-gui， git-svn， gitk， stgit
+- git-completion：Git命令的自动补齐功能
+- openssh：SSH客户端，因有些git仓库是需要SSH服务访问的
+- vim: Git的默认编辑器

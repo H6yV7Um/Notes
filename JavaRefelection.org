@@ -1,0 +1,248 @@
+#+HTML_HEAD: <link rel="stylesheet" type="text/css" href="css/norang.css" />
+##+STYLE: <link rel="stylesheet" type="text/css" href="css/worg-zenburn.css" />
+#+OPTIONS: email:t
+#+LINK_HOME: ../public_html/sitemap.html
+#+TITLE: Java Reflection
+#+AUTHOR: Howard Hou
+#+EMAIL: howard.hou@ericsson.com
+
+
+* The Class Class
+The =Class= object describes the properties of a particular class. 
+
+Three ways to get an instance of =Class= object
+- =class= literal
+ - Does not trigger class loading. 
+ - Works with regular classes as well as interfaces, arays, and primitives. 
+ - The =Class= object is parameterized. Example, =Date.class= is of type =Class<Date>=.
+- =Class.forName()=
+ - Trigger class loading, but not constructors.
+- =getClass= of =Object=
+ - If it is invoked on a reference with type /T/, then it returns =Class<? extends S>= where /S/ is the erasure of /T/.
+
+Examples to get an instance of =Class= type
+#+begin_src java
+Date d = new Date();
+Class c1 = d.getClass();
+
+String className = "java.util.Date";
+Class c2 = Class.forName(className);
+
+Class c3 = Date.class;
+
+Employee e2 = (Employee) new Manager();
+System.out.println(e2.getClass().getSimpleName()); //output: Manager
+
+ArrayList<String> as1 = new ArrayList<String>(){{add("Harry"); add("Tony");}};
+System.out.println(as1.getClass().getSimpleName()); //no output
+#+end_src
+
+To get the =Class= object of the current class
+- in non static method, using =getClass()= directly
+- in static method, using =new Object(){}.getClass().getEnclosingClass()=
+
+The VM manages a unique =Class= object for each type, so you can use the /==/ operator to compare class objects. 
+
+You can use =newInstance= method on a =Class= object to call the no-argument constructor and to create an object. 
+
+You cannot perform casts involving parameterized type, how can you turn =Class<?>= into a known type? the solution 
+is the =public <T> Class<? extends T> asSubclass(Class<T> subType)= of =Class=.
+#+begin_src java
+Class<? extends String> c3 = Class.forName("java.lang.String").asSubclass(String.class);
+#+end_src
+
+- =TypeVariable[] getTypeParameters()=
+ 
+ gets the generic type variables if this type was declared as a generic type, or an array of length 0 otherwise.
+- =Type getGenericSuperclass()=
+ 
+ gets the generic type of the superclass that was declared for this type, or null if this type is Object or not a class type
+- =Type[] getGenericInterfaces()=
+
+ gets the generic types of the interfaces that were declared for this type, in declaration order, or an array of length 0 
+ if this type does not implement interfaces
+- =Constructor<?>[] getDeclaredConstructors()=
+- =Constructor<T> getDeclaredConstructor(Class<?>... parameterTypes)=
+
+ gets an array of Constructor object(s) reflecting all(or specified) constructor(s) declared by the class.
+- =Method[] getDeclaredMethods()=
+- =Method getDeclaredMethod(String name, Class<?>... parameterTypes)=
+
+ gets an array of Method object(s) reflecting all(or specified) method(s) declared by the class or interface
+- =Field[] getDeclaredFields()=
+- =Field get DeclaredField(String name)=
+
+ gets an array of Field object(s) reflecting all(or specified) field(s) declared by the class or interface
+* Classes
+All three classes =Field=, =Method= and =Constructor= have =String getName()= and =int getModifiers()=. 
+
+To override access control, invoke =setAccessible= method of =AccesssibleObject= class on a 
+=Field=, =Method= or =Constructor= object.
+
+** The Field Class
+There are special circumstance, such as deserialization, where it makes sense to change the value of a =final= field, 
+You can do this via reflection only on instance fields, and only if =setAccessible(true)= has been invoked on the 
+/Field/ object.
+
+** The Constructor Class
+An inner class(excluding local and anonymous inner classes) never has a non-arg constructor, since the compiler 
+transforms all inner class constructors to take a first parameter that is a reference to the enclosing object. That 
+means you can never use =Class.newInstance= to create an inner class object, so you must use =Constructor= objects. 
+The =Constructor= objects for an inner class reflect the transformed code, not the code written by the programmer. 
+#+begin_src java
+Class<Action> ac = Action.class;
+Constructor<Action> con = ac.getDeclaredConstructor(BankAccount.class, String.class, Long.class);
+BankAccount acct = new BankAccount();
+Action a = con.newInstance(acct, "Howard", 10000L);
+#+end_src
+** The Method Class
+It has an =Object invoke(Object obj, Object... args)=, the first parameter is the object of the class.
+
+- =TypeVariable[] getTypeParameters()=
+ 
+ gets the generic type variables if the method was declared as a generic method, or an array of length 0 otherwise.
+
+- =Type[] getGenericParameterTypes()=
+ 
+ getsn array of Type objects that represent the formal parameter types, in declaration order. If the method has no parameters, an array of 
+ length 0 is returned
+
+- =Type getGenericReturnType()=
+
+ gets a Type object that represents the formal return type
+
+* Interfaces
+=Type= is a marker interface, and it is superinterface of =GenericArrayType=, =ParameterizedType=, 
+=TypeVariable<D>=, =WildType=.
+** The TypeVariable Interface
+It describes type variables, such as =T extends Comparable<? super T>=.
+
+- =String getName()=
+- =Type[] getBounds()=
+
+ gets the subclass bounds
+
+** The WildcardType Interface
+It describes wildcards, such as =? super T=, =? extends T=, =?=.
+
+- =Type[] getUpperBounds()=
+ 
+ gets the subclass(/extends/) bounds
+
+- =Type[] getLowerBounds()=
+ 
+ gets the superclass(/super/) bounds.
+
+** The ParameterizedType Interface
+It describes generic class or interface types, such as =Comparable<? super T>=.
+
+- =Type getRawType()=
+- =Type[] getActualTypeArguments()=
+ 
+ gets the type parameters(perhaps type of =TypeVariable=, =WildcardType= or =Class=) with which the parameterized typ was declared, 
+- =Type getOwnerType()=
+
+ gets the enclosing class type if this is an inner type
+
+** The GenericArrayType Interface
+It describes generic arrays in which the component type is a parameterized type or a type variable. such as =T[]=.
+
+- =Type getGenericComponentType()=
+ 
+ gets the generic component type with which the array type was declared.
+
+* An Example
+#+begin_src java
+public class Hello {
+	public static void main(String[] args) {
+		String name = "java.util.ArrayList";
+
+		try{
+			Class<?> cl = Class.forName(name);
+			printClass(cl);
+			System.out.println();
+			for(Method m : cl.getDeclaredMethods()) {
+				printMethod(m);
+			}
+		}
+		catch(ClassNotFoundException e) {
+			e.printStackTrace();
+		}
+	}
+	public static void printClass(Class<?> cl) {
+		System.out.println(cl); //class java.util.ArrayList
+		printTypes(cl.getTypeParameters(), "<", ", ", ">", true); //<E>
+		Type sc = cl.getGenericSuperclass(); 
+		if(sc != null) { // extends AbstractList<E>
+			System.out.print(" extends ");
+			printType(sc, false); 
+			System.out.println("");
+		}
+		// implements List<E>, RandomAccess, Cloneable, Serializable
+		printTypes(cl.getGenericInterfaces(), " implements ", ", ", "", false);
+		System.out.println();
+	}
+
+	public static void printMethod(Method m) {
+		String name = m.getName();
+		System.out.print(Modifier.toString(m.getModifiers()));
+		System.out.print(" ");
+		printTypes(m.getTypeParameters(), "<", ", ", ">", true);
+
+		printType(m.getGenericReturnType(), false);
+		System.out.print(" ");
+		System.out.print(name);
+		System.out.print("(");
+		printTypes(m.getGenericParameterTypes(), "", ", ", "", false);
+		System.out.println(")");
+		
+	}
+	public static void printTypes(Type[] types, String pre, String sep, String suf, boolean isDefinition) {
+		if(pre.equals(" extends ") && Arrays.equals(types, new Type[]{Object.class})) return;
+		if(types.length>0) System.out.print(pre);
+		for(int i=0; i<types.length; i++) {
+			if(i>0) System.out.print(sep);
+			printType(types[i], isDefinition);
+		}
+		if(types.length>0) System.out.print(suf);
+	}
+		
+    public static void printType(Type type, boolean isDefinition) {
+		if(type instanceof Class) {
+			Class<?> t = (Class<?>) type;
+			System.out.print(t.getSimpleName());
+		}
+		else if(type instanceof TypeVariable) {
+			TypeVariable<?> t = (TypeVariable<?>) type;
+			System.out.print(t.getName());
+			if(isDefinition){
+				printTypes(t.getBounds(), " extends ", " & ", "", false);
+			}			
+		}
+		else if(type instanceof WildcardType){
+			WildcardType t = (WildcardType) type;
+			System.out.print("?");
+			printTypes(t.getUpperBounds(), " extends ", " & ", "", false);
+			printTypes(t.getLowerBounds(), " super ", " & ", "", false);
+		}
+		else if(type instanceof ParameterizedType){
+			ParameterizedType t = (ParameterizedType) type;
+			Type owner = t.getOwnerType();
+			if(owner!=null) {
+				printType(owner, false);
+				System.out.print(".");
+			}
+			printType(t.getRawType(), false);
+			printTypes(t.getActualTypeArguments(), "<", ", ", ">", false);
+		}
+		else if(type instanceof GenericArrayType){
+			GenericArrayType t = (GenericArrayType) type;
+			System.out.print("");
+			printType(t.getGenericComponentType(), isDefinition);
+			System.out.print("[]");
+		}
+			
+    }
+		
+}
+#+end_src

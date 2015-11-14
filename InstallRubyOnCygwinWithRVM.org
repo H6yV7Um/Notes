@@ -1,0 +1,30 @@
+#+HTML_HEAD: <link rel="stylesheet" type="text/css" href="css/norang.css" />
+##+STYLE: <link rel="stylesheet" type="text/css" href="css/worg-zenburn.css" />
+#+OPTIONS: email:t
+#+LINK_HOME: ../public_html/sitemap.html
+#+TITLE: 使用RVM在cygwin上安装Ruby
+#+AUTHOR: Howard Hou
+#+EMAIL: howard.hou@ericsson.com
+
+使用cygwin的setup.exe安装curl。
+
+安装RVM(Ruby Version Manager)
+#+begin_src sh
+$curl -L https://get.rvm.io | bash -s stable --ruby
+curl: (77) error setting certificate verify locations:
+CAfile: /usr/ssl/certs/ca-bundle.crt
+#+end_src
+错误解决：使用setup.exe安装ca-certificates
+
+安装ruby
+- 列出已安装ruby的版本： =rvm list=
+- 列出可用的ruby版本： =rvm list known=
+- 删除某ruby版本： =rvm remove 1.9.2=
+- 选择使用某ruby的版本： =rvm use 1.9.3=
+- 安装某版本的ruby
+  - 前提依赖
+   - setup.exe安装 GCC
+   - setup.exe安装 Make
+  - =rvvm install 1.9.3=
+  - 设置为默认： =rvm use ruby 1.9.3 -default=
+  - =rvm rubygems latest=
