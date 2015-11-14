@@ -1,7 +1,7 @@
 *.html
 Sitemap.org
-/temp/
 *.png
 *.jpg
+/temp_*/
 !image/*.png
 !image/*.jpg
