@@ -1,0 +1,90 @@
+#+HTML_HEAD: <link rel="stylesheet" type="text/css" href="css/norang.css" />
+##+STYLE: <link rel="stylesheet" type="text/css" href="css/worg-zenburn.css" />
+#+OPTIONS: email:t
+#+LINK_HOME: ../public_html/sitemap.html
+#+TITLE: 批量替换文件名及文件内容
+#+AUTHOR: Howard Hou
+#+EMAIL: howard.hou@ericsson.com
+
+该ruby程序用来，批量替换位于某文件夹下，符合某规则的文件名及文件中的内容。
+#+begin_src ruby
+require 'FileUtils'
+
+def string_replace(rep_set, str)
+  rep_set.each_with_index do |h, idx|
+    re = Regexp.new h.keys[0]
+    if str =~ re
+      str.gsub!(re, h.values[0])
+    end
+  end
+  str
+end
+
+def dir_traverse(dir, regexp, &block)
+  Dir.open(dir) do |dir|
+    dir.each do |sd|
+      if [".", ".."].include? sd
+        next
+      end
+      fd = "%s\\%s"%[dir.path, sd]
+      if File.directory?(fd)
+        dir_traverse(fd, regexp, &block)
+      elsif sd =~ regexp
+          block.call fd #yield fd
+      end
+    end
+  end
+end
+
+def fileContent_replace(file_name, rep_set)
+  File.open(file_name, 'r+') do |file|
+    fc = ''
+    file.each_with_index do |line, number|
+      string_replace rep_set, line
+      fc << line
+    end
+    file.seek 0
+    file.truncate 0
+    file.write fc
+  end
+end
+
+def change_fileContent_under_folder(rep_set, fregexp, dir)
+  dir_traverse(dir, fregexp) do |fpath|
+    fileContent_replace(fpath, rep_set)
+  end
+end
+
+def rename_file rep_set, oldfilename
+  dir = File.dirname(oldfilename)
+  oldfile = oldfilename.split("\\")[-1]
+  newfile = string_replace rep_set, oldfile.dup
+  newfilename = "%s\\%s"%[dir, newfile]  # {dir}\\#{newfile}"  
+  puts oldfilename
+  puts newfilename
+
+  if newfilename != oldfilename
+    File.rename(oldfilename, newfilename)
+  end
+end
+
+def change_fileName_under_folder(rep_set, fregexp, dir)
+  dir_traverse(dir, fregexp) do |fpath|
+    rename_file(rep_set, fpath)
+  end
+end
+
+if __FILE__ == $0
+  #example 1, usage of change_fileName_under_folder
+  dir = 'C:\test' #this directory will be traversed
+  fregexp = Regexp.new(".txt$") #file name end with ".txt"
+  rep_set = [{'^create_'=>'crt_'}] # initialed "creat_" in file name will be replaced with "crt_"
+  change_fileName_under_folder(rep_set, fregexp, dir)
+
+  #example 2, usage of change_fileContent_under_folder
+  dir = 'C:\test' #this directory will be traversed
+  fregexp = Regexp.new(".txt$") #file name end with ".txt"
+  rep_set = [{'delete_'=>'dlt_'}, {'create'=>'crt_'}] # "delete_" and "create_" in the file will be replaced by "dlt", "crt_" respectively
+  change_fileContent_under_folder rep_set, fregexp, dir
+end
+#+end_src

@@ -1,0 +1,144 @@
+#+TITLE: Git用户协作
+
+问题引出
+#+begin_src git
+$ git init --bare ./git-share.git
+Initialized empty Git repository in c:/Documents and Settings/lhou/git-share.git/
+$ git clone ./git-share.git/ git-user1
+Cloning into 'git-user1'...
+warning: You appear to have cloned an empty repository.
+done.
+$ git clone ./git-share.git/ git-user2
+Cloning into 'git-user2'...
+warning: You appear to have cloned an empty repository.
+done.
+$ cd git-user1/
+$ echo user1 > user1.txt
+$ git add .
+$ git commit -m "user1.txt"
+[master (root-commit) 55a3ee5] user1.txt
+ 1 file changed, 1 insertion(+)
+ create mode 100644 user1.txt
+$ git push origin master
+Counting objects: 3, done.
+Writing objects: 100% (3/3), 221 bytes, done.
+Total 3 (delta 0), reused 0 (delta 0)
+To c:/Documents and Settings/lhou/./git-share.git/
+ * [new branch]      master -> master
+$ cd ../git-user2
+$ echo user2 > user2.txt
+$ git add .
+$ git commit -m "user2.txt"
+[master (root-commit) ae6e8ee] user2.txt
+ 1 file changed, 1 insertion(+)
+ create mode 100644 user2.txt
+$ git push origin master
+To c:/Documents and Settings/lhou/./git-share.git/
+ ! [rejected]        master -> master (non-fast-forward)
+error: failed to push some refs to 'c:/Documents and Settings/lhou/./git-share.git/'
+hint: Updates were rejected because the tip of your current branch is behind
+hint: its remote counterpart. Merge the remote changes (e.g. 'git pull')
+hint: before pushing again.
+hint: See the 'Note about fast-forwards' in 'git push --help' for details.
+#+end_src
+为什么git-user2向共享的版本库推送(git push)其最新更新时，失败了呢？ 
+
+因为这是非快进式推送（non-fast-forward）！ 
+快进式推送指要推送的本地版本库的提交是建立在远程版本库相应分支的现有提交基础上的，也即远程版本库相应分支的最新提交应该是本地版本库最新提交的祖先提交。 
+
+详情如下，
+#+begin_src git
+$ git log
+commit ae6e8ee8c49c14b864911b2acf782d075da09875
+Author: tech-note <Email Addr>
+Date:   Thu Feb 28 11:00:39 2013 +0800
+
+    user2.txt
+$ cd ../git-share.git/
+$ git log
+commit 55a3ee5f6f2c4c6d7e591ccb500bcd8707798f1d
+Author: tech-note <Lianhong.Hou@calix.com>
+Date:   Thu Feb 28 10:58:11 2013 +0800
+
+    user1.txt
+#+end_src
+上面输出显示，git-share.git的最新提交是55a3ee,而git-user2并没有看到这个提交，因为根本没有在git-user2中执行git pull或类似的操作，所以55a3ee这个提交就没有成为git-user2最新提交ae6e8e的祖先提交，故这是非快进式提交。 
+
+解决办法就是合并后在提交。具体如下，
+#+begin_src git
+$ cd ../git-user2/
+$ git pull
+warning: no common commits
+remote: Counting objects: 3, done.
+remote: Total 3 (delta 0), reused 0 (delta 0)
+Unpacking objects: 100% (3/3), done.
+From c:/Documents and Settings/lhou/./git-share
+ * [new branch]      master     -> origin/master
+Merge made by the 'recursive' strategy.
+ user1.txt | 1 +
+ 1 file changed, 1 insertion(+)
+ create mode 100644 user1.txt
+$ git log
+commit 053877fbc6f6a32cbd3ce7879f40213b4d31b373
+Merge: ae6e8ee 55a3ee5
+Author: tech-note <Lianhong.Hou@calix.com>
+Date:   Thu Feb 28 12:22:46 2013 +0800
+
+    Merge branch 'master' of c:/Documents and Settings/lhou/./git-share
+
+commit ae6e8ee8c49c14b864911b2acf782d075da09875
+Author: tech-note <Lianhong.Hou@calix.com>
+Date:   Thu Feb 28 11:00:39 2013 +0800
+
+    user2.txt
+
+commit 55a3ee5f6f2c4c6d7e591ccb500bcd8707798f1d
+Author: tech-note <Lianhong.Hou@calix.com>
+Date:   Thu Feb 28 10:58:11 2013 +0800
+
+    user1.txt
+$ git log --graph --oneline
+*   053877f Merge branch 'master' of c:/Documents and Settings/lhou/./git-share
+|\
+| * 55a3ee5 user1.txt
+* ae6e8ee user2.txt
+$ git push
+warning: push.default is unset; its implicit value is changing in
+Git 2.0 from 'matching' to 'simple'. To squelch this message
+and maintain the current behavior after the default changes, use:
+
+  git config --global push.default matching
+
+To squelch this message and adopt the new behavior now, use:
+
+  git config --global push.default simple
+
+See 'git help config' and search for 'push.default' for further information.
+(the 'simple' mode was introduced in Git 1.7.11. Use the similar mode
+'current' instead of 'simple' if you sometimes use older versions of Git)
+
+Counting objects: 6, done.
+Delta compression using up to 4 threads.
+Compressing objects: 100% (3/3), done.
+Writing objects: 100% (5/5), 526 bytes, done.
+Total 5 (delta 0), reused 0 (delta 0)
+To c:/Documents and Settings/lhou/./git-share.git/
+   55a3ee5..053877f  master -> master
+#+end_src
+可以看出，
+- git pull包含了两个动作
+  - 获取远程版本库的最新提交ae6e8ee
+  - 与本地提交合并,合并的提交ID是053877
+- git push成功完成推送
+事实上，在非快进式推送不成功的情况下，可以通过-f参数来强制推送的，但这是不建议的，那么如何禁止非快进式推送（包括强制推送）呢？
+- 配置版本库
+#+begin_src git
+$ pwd
+/c/Documents and Settings/lhou/git-share.git
+$ git --git-dir=. config receive.denyNonFastForward true
+#+end_src
+- 通过版本库的钩子脚本实现, 可实现精细的授权控制，比如
+  - 只对部分用户进行限制
+  - 允许特定用户执行非快进式推送
+  - 只允许某些分支可以进行强制提交
+

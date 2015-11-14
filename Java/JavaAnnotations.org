@@ -1,0 +1,19 @@
+#+TITLE: Java Annotations
+
+* Annotations
+Annotations provide information about your program, or the elements of that program(classes, methods, fields, 
+variables, and so forth), in a structured way that is amenable to automated processing by external tools.
+
+An annotation is considered a modifier(like =public= or =static=) and should appear before other midifiers on a line.
+
+It is indicated by an *@* character followed by the name of an annotation type. Example to define an annotation type.
+#+begin_src java
+@interface Reviewed { // an annotation type is a special kind of interface
+  String reviewer();
+  int date();
+}
+#+end_src
+
+For package annotations, you can create a file called /package-info.java/ within the package directory, and put in 
+the file nothing but a package statement with any annotations for the package(plus any useful comments, of course).
+

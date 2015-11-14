@@ -1,0 +1,199 @@
+#+TITLE: Java Generics
+
+** Declarations
+*** Constructors
+Type parameters are declared in the header of the class, not in the constructors, however, actual type parameters are 
+passed to the constructors whenever it is invoked.
+*** Static Members
+Because of /erasure/, static members of a generic class are shared across all instatiations of that class, including 
+instantiations at different types. Static members of a class cannot refer to the type parameter of a generic class, 
+and when acessing a static member the class name should not be parameterized.
+*** Nested Classes
+If the outer class has type parameters and the inner class is not static, then type parameters of the outer class 
+are visible whithin the inner class.
+
+Any parameterized types that a class (or interface) extends (or implements) must be concrete types in which the 
+immediate type argument is not a wildcard. Example, you cannot define a class that implements =List<?>=, but the 
+class can implement =List<List<?>>=.
+
+you can extend a non-generic type to produce either a generic or non-generic subtype. You can extend a generic type to produce 
+a generic type. You can extend a specific parameterized type to yield a non-generic subtype.
+
+** Type Parameters
+You can declare a generic method by defining type variables between the method modifiers and the method return 
+type, much as you would declare type variables for a generic class or interface. To call a generic method, you can 
+place the actual types, enclosed in angle brackets, just before the method name.
+
+Working with a generic class, you must specify the type parameters when you instantiate the class, but working with 
+a generic method, you do not usually have to specify the parameter types. The way to specify the type in a generic 
+method is placing the type in angle brackets after the dot and immediately preceding the method name.
+
+A nested type(including anonymous inner classes) can also be declared as a generic type with its own type variables. 
+Type variables in a static nested type is distinct from any type variables in the enclosing type, even if they have 
+the same name.
+
+If the nested type is an inner class, then the type variables of the enclosing class declaration are accessible to 
+it and can be used directly. A type variable in the inner class can hide any type variables with the same name in 
+the enclosing class.
+
+As with inner generic types, if a generic method declares a type variable of the same name as that of a type variable 
+in the method's class or interface, the outer name is hidden.
+
+Within a generic class defination, a type parameter can appear in any non-static declaration, like a field 
+declaration, a method return type or paramter type declaration, a local variable declaration, or a nested type 
+declaration. Type parameters cannot be intstantiated with primitive types.
+
+The keyword =extends= is used in bounded type paramters to mean either "extends" or "implements". A type bound can 
+extends one class or interface followed by an /&/ separated list of additional interfaces. Considering the type
+variables are erased and replaced by their first bounding type(or =Object= for variables without bounds), you 
+should place the class bounding type as the first one in the bounds list, also should put marker interfaces
+(interfaces without methods) at the end of thr bounds list.
+ 
+Unlike wildcards, type variables must always be bounded using /extends/, never /super/.
+
+=List<Integer>= is not subtype of =List<Number>=, not subtype of Collection<Number>, but subtype of Collection<Integer>. 
+It is always ok to convert a parameterized type to a raw type. 
+
+** Wildcards 
+=The wildcard in =? extends Employee= is restricted to subclass of =Employee=, whereas the wildcard in 
+=? super Manager= is restricted to supertypes of =Manager=. 
+
+Unlike a bounded type variable, a bounded wildcard(use type argument wildcard /?/) can have only a single bound 
+type either an upper bound or a lower bound. Example, you can not say =List<? extends Value&Serializable>. 
+
+=List<?>= is not =List<Object>=, but =List<? extends Object>=.
+
+Unbounded wildcards is wildcards without bounds, like =Pair<?>=, it has two methods: =? getFirst()= and =void setFirst(?)=. 
+The return value of =? getFirst()= can only be assigned to an =Object=, the =void setFirst(?)= can never be 
+called, not even with an =Object=.
+
+In contrast to the non-wildcard versions, parameterized types that include a bounded wildcard are related in 
+the way you might have expected. Example, =List<? extends Integer>= is subtype of =List<? extends Number>=, 
+which is subtype of =List<?>=; =List<? super Number>= is a subtype of =List<? super Integer>=. In addition, 
+non-wildcard parameterized types are subtype of suitably bounded, wildcard parameterized types. Example, 
+both =List<Integer>= and =List<Number>= are subtype of =List<? extends Number>=.
+
+Typically, parameters use lower-bounded wildcards, while return values use upper bounded wildcards. If there is a 
+constraint between a parameter type and the return type, it may not be possible to use a wildcard.
+#+begin_src java
+ArrayList<Manager> ma = new ArrayList<Manager>();
+ArrayList<? extends Employee> ea = ma;
+		
+ma.add(new Manager());
+
+ea.get(0);
+ea.set(0, new Manager()); // error: no suitable method found for set(int,Manager)
+#+end_src
+
+Since wildcard represents an unknown type, you cannot do anything that requires the type to be known. 
+ wildcard should not appear at the /top level/ in instance creation expression(new), in explicit type parameters 
+in generic method calls, or in supertypes(=extends= and =implements=). Example
+#+begin_src java
+LinkedList<?> s = new LinkedList<String>();
+s.add("hello"); //comppile error
+
+LinkedList<? extends Number> n = new LinkedList<Number>();
+n.add(25);  //commpile error
+
+List<?> list = new ArrayList<?>(); //Compile error
+List<List<?>> lists = new ArrayList<List<?>>(); //ok
+
+List<?> list = Lists.<?>factory(); //error
+List<List<?>> list = Lists.<List<?>>factory(); //ok
+
+class AnyList extends ArrayList<?> {} // error
+class AnyList extends ArrayList<List<?>> {} // ok
+#+end_src
+In contrast, given a lower-bounded wildcard type, the wildcard is known to be the same as, or super type of, 
+the bound, so adding an element of the same type as the bound is always correct. Example
+#+begin_src java
+LinkedList<? super Number> n = new LinkedList<Number>();
+n.add(25);	
+#+end_src
+
+The coversion of the capture of the wildcard to a type is known as capture coversion. Example, 
+#+begin_src java
+public static void <T> rev(List<T> list) {
+  List<T> tmp = new ArrayList<T>(list);
+  for(int i=0; i<list.size(); i++){
+    list.set(i, tmp.get(list.size()-i-1));
+  }
+}
+public void reverse(List<?> list) { // it is equivalent to rev()
+  rev(list); //type variable T of rev() captured the wildcard
+}
+#+end_src
+Some restrictions on when 
+capture conversion can apply:
+- capture conversion won't apply if the type parameter is used with more than one method parameter.
+- you can only apply capture conversion if the type variable is defined at the top-level of the generic type.
+
+
+** Erasure
+Drop all type parameters from parameterized types, and replace any type variable with the erasure of its bound, or with 
+=Object= if it has no bound, or with the erasure of the leftmost bound if it has multiple bounds.
+
+There is a single class defination for a generic class, no matter how many different parameterized invocations there 
+may be. For a generic class with a type parameter, say /E/, this fact has consequences
+- cannot use /E/ in the type of a static field or anywhere within a static method or static initializer.
+- cannot instantiate /E/
+
+Erasure process impacts your program in two key areas:
+- The runtime actions that can involved generic types
+ - cannot instantiate a type represented ony as a type parameter, nor can you create an array of such a type.
+   cannot do =new T()= or =new T[n]=
+ - cannot create an array whose element type is a parameterized type. =new List<String>[1]= is illegal. 
+   You can use /ArrayList/ instead.
+ - cannot use =instanceof= to see if an object is an instance of a parameterized type.
+ - =getClass= method always returns the raw type
+ - cast involving type parameters or parameterized types are replaced with casts to the erasure of that type
+  a cast from =Collection<T>= to =List<T>= is ok becuase it does not involve a change to type parameter.
+ - a catch clause cannnot declare that it catches an exception represented by a type variable even if the bound on 
+  that type variable is an exception type. The exact type of the exception must be known at compile time.
+ - a generic class is not allowed to directly extend =Throwable=
+ - cannot use a parameterized type in a class literal expression. like =Class c = LinkedList<String>.class=.
+- Method overloading and overriding
+ - definition of "same signature" for two generic methods requires that they have the same number of type variables 
+ with the same corresponding bounds. 
+ - two methods have override-equivalent signatures if their signatures are the same, or if the erasures of their 
+ signatures are the same. A method without generic types can override a method with generic types, but not the other 
+ way around.
+ - two methods are overloaded if they have the same name and do not have override-equivalent signatures.
+** Overloading Methods
+Considering generic types and generic methods(and constructors), changes on [[Overloading Methods][Overloading Methods]] summarized below:
+- If the method invocation includes explicit type arguments, then 
+ - potential applicable generic methods must have the same number of type parameters.
+ - non-generic methods perhaps also be potential applicable, in which case the actual type arguments are ignored.
+- If the method invocation without explicit type arguments, then
+ - a generic method might be potential applicable, that depends on if type arguments can be inferred based on the static types of the invocation.
+- once potential applicable methods are determined, applicable methods are determined as [[Overloading Methods][Overloading Methods]] described.
+- when the most specific method is searched for, type inferrence is again used when generic methods are being considered.
+ However, this time the type inferrence is not based on the actual arguments in method invocation, rather, the formal parameters of another applicable
+ method.
+
+An example, two methods defined, they are =void m(String k, Object v)= and =<S, T extends Number> void m(S k, T v)=.
+when call =m("Hello", Integer.valueOf(29))=
++ Inferred type is <String, Integer>, both of them are applicable.
++ check if 1st method is more specific than 2nd method.
+ + if each parameter of 1. is subtype of corresponding parameter of 2.
+
+  the 2nd method is generic method, and infers type of 2nd method by that of 1st method, result is <String, Object>
+  because String is converted to S and Object is converted to T. Note the bound on T is not considered here.
+  since the result is the same as 1st method, pass.
+ + if each parameter of 1st method is subtype of bounds of corresponding type parameter of 2nd method.
+  
+  bounds for 2nd method is <Object, Number> since the 2nd parameter of 1st method is not subtype of Number, failure!
+  so 1st method is not more specific than 2nd method.
++ check if 2nd method is more specific than 1st method
+ + if each paramter of 2nd method is subtype of corresponding paramter of 1st method
+  
+  A type variable is a subtype only of its bouds(and their supertypes), so for 2nd method is <Object, Number>.
+  since the 2nd parameter(Object) of 1st method is not a subtype of Number, failure! 
+  so 2nd method is not more specific than 1st method
+
+Since neither method is more specific than another, the call is ambiguous and the compiler rejects it as such.
+
+
+
+
+

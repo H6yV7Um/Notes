@@ -1,0 +1,183 @@
+#+TITLE: Fundamental Programming Structures in Java
+
+* Comment
+Three styles of comment
+   - single line comment after //
+   - multiple line comment between /\* and *\/
+   - documentation comment between /\** and *\/
+
+** Documentation Comments
+=javac= generates HTML documentation from source files. It extracts infomation for the following items:
+*** Packages
+
+*** public classes and interfaces
+The class comment must be placed after any =import= statements, directly before the =class= defination.
+*** public and protected constructors and methods
+The method comment must immediately precede the method that it describes. All =@param= tags for one method 
+must kept together one by one. =@return= tag return type of the method. =@throws= tag for exceptions of the method.
+
+*** General Comments 
+The following tags can be used in class documentation comments:
+- multiple =@author= tags, one for each author
+- =@version= for current version
+The following tags can be used in all documentation comments:
+- =@since= describes the version that introduced this feature. 
+ 
+ Example, =@since version 1.7.1=
+- =@see= to add a hyperlink. 
+  
+  Example, =@see com.horstman.corejava.Emplyee#raiseSalary(double)=, 
+  /#/ is used to separate the class from the method or variable name.
+* Built-in Types
+| Type    | Storage Requirement   |       Default         | Boxing Type |
+|---------+-----------------------+-----------------------+-------------|
+| int     | 4 bytes               |        0              | Integer     |
+|---------+-----------------------+-----------------------+-------------|
+| short   | 2 bytes               |        (short)0       | Short       |
+|---------+-----------------------+-----------------------+-------------|
+| long    | 8 bytes               |        0L             | Long        |
+|---------+-----------------------+-----------------------+-------------|
+| byte    | 1 bytes               |        (byte)0        | Byte        |
+|---------+-----------------------+-----------------------+-------------|
+| float   | 4 bytes               |        0.0f           | Float       |
+|---------+-----------------------+-----------------------+-------------|
+| double  | 8 bytes               |        0.0d           | Double      |
+|---------+-----------------------+-----------------------+-------------|
+| char    | 2 bytes               |        '\u0000'(null) | Character   |
+|---------+-----------------------+-----------------------+-------------|
+| boolean | -                     |        false          |     Boolean |
+
+All of =byte=, =short=, =int= and =long= are signed.
+
+The =Char= type describes a code unit for representing Unicode code points in the UTF-16 encoding, 
+and is used to describe individual characters.
+
+Java does not specify the storage usage of =boolean= variables, most popular JVM store it as an interger. 
+It has two values, =true= and =false=. Unlike c/c++, the value /0/ is neither =false= nor =true=, also the 
+expression /x=0/ does not return boolean.
+
+An integer division by 0 raises an exception, whereas floating-point division by 0 yields an infinite or NaN result. 
+
+Although =null= is subtype of every reference type, the =instanceof= operator is defined to return =false= when its 
+left operand is =null=.
+** Enumeration Classes
+#+begin_src java
+//Actually a class with 3 instances, no possibility to construct new onjects.
+public enum Size {SMALL, MEDIUM, LARGE};
+
+Size.SMALL.toString();//returns "SMALL"
+Size s = Enum.valueOf(Size.class, "SMALL"); //returns Size.SMALL
+//to return array with elements Size.SMALL, Size.MEDIUM, Size.LARGE
+Size[] vs = Size.Values(); 
+int idx = Size.MEDIUM.ordinal(); //the position of Size.MEDIUM, starting from 0
+#+end_src
+** Boxing Type
+The autoboxing specification requires that =boolean=, =byte=, =char=<=127, =short= and =int= between -128 and 127 
+are boxed into fixed objects, that is, if both /a/ and /b/ are type of /Integer/, and have value /100/, then 
+they refer to the same object.
+ 
+The objects of Boxing classes are imutable, you cannot change their values. 
+The Boxing classes are =final=, you cannot extend it.
+
+All of Boxing Types have =valueOf= method to convert from corresponding primitive type to it. 
+Also all of Boxing Types have /xxxValue/ method to returns variable of /xxx/ primitive type.
+
+** Array
+The array identifier is actually a reference to a true object that is created on the heap, and holds the references 
+to other objects or the primitive values directly if the elements are primitives.
+
+Array bounds overflow can never happen since java allocates a small amount of memory overhead on each array as 
+well as verifying index at run time.
+
+Each array nested in an array can can have different size.
+
+Array initialization:
+#+begin_src java
+String[] attrs = new String[12]; // No construtor of String called
+String[] dangers = {"Lions", "Tigers"};
+printStr(new String[] {"Lions", "Tigers"});
+#+end_src
+
+The array length need not be a constant. Once you create an array, you cannot change its size.
+
+When you create an array of numbers, all elements are initialized with zero. Arrays of =bpplean= are initialized 
+with =false=. Arrays of objects are initialized with the special value =null=.
+
+You can copy one array variable into another, but then both variables refer to the same array. Example
+#+begin_src java
+int[] lna = spa;
+lna[2] = 10; //now, spa[2] is also 10
+#+end_src
+
+Arrays of subclass reference can be converted to arrays of superclass references without a cast, and then cast 
+it back, but arrays still remember the element type with which they were created. Example
+#+begin_src java
+class Employee{}
+class Manager extends Employee {}
+
+Manager[] m = new Manager[3];
+Employee[] e = m;
+e[0] = new Employee(); //ArrayStoreException 
+m = (Manager[]) e; // ok, because e actually is Manager[]
+
+Employee[] e1 = new Employee[2];
+Manager[] m1 = (Manager[]) e1; //ClassCastException, because e1 actually is Employee[]
+#+end_src
+* Operators, Statements and Control Flow
+Operators =&=, =|=, and =^= are logical operators when their operands are boolean values and 
+bitwise operators when their operands are integer values.
+
+Operators =||= and =&&= are logical operators, and can only be used when boolean operands. They are short-cut 
+operators whereas =&=, =|= are not.
+
+Operator == to check if two varaibles refer to the same object.
+
+Unlike c/c++, Java has not comma operator, but you can yse a comma separated list of expressions in the first and third slot 
+of a =for= statement.
+
+There is no /goto/, but there is a "labeled" version of =break= that you can use to break out of a nested loop.
+
+* String
+Java does not have a built-in string type, instead, the standard Java Library provides it.
+
+=String= object has a =length= method while =Array= object has a =length= attribute.
+
+=charAt= method of =String= object takes an integer index and returns the character at the index.
+
+Strings are immutable.
+
+A =String= variable can also hold a special value, called =null=, that indicates that no object is currently 
+associated with the variable.
+
+Java strings are implementedc as sequence of =char= values, and =char= data type is a code unit for representing 
+Unicode code points in the UTF-16 encoding, the most commonly used Unicode characters can be represented with a 
+single code unit, but there are some other characters that requires a pair of code units. 
+#+begin_src java
+String greeting = "greeting";
+int n = greeting.length(); // the number of code units
+int cpCnt = greeting.codePointCount(0, n); //the true length, that is the number of code points
+char c = greeting.chatAt(2); // 2nd code unit
+int cp = greeting.codePointAt(2); //the 2nd code point
+int i = 0;
+
+while(i<n) { //traverse a string
+  cp = greeting.codePointAt(i);
+  if(Character.isSupplementaryCodePoint(cp)){
+    i += 2;
+  }
+  else {
+    i++;
+  }
+}
+#+end_src
+
+It is inefficient to concatenate strings with operator /+/, instead, you should use =StringBuilder=. Example
+#+begin_src java
+StringBuilder b = new StringBuilder();
+
+b.append(singleChar);
+b.append(str);
+String s = b.toString();
+#+end_src
+=StringBuffer= is slightly less efficient, but it allows multiple threads to add or remove characters, and 
+it has not implemented =equals= method. 

@@ -1,0 +1,7 @@
+*.html
+Sitemap.org
+/temp/
+*.png
+*.jpg
+!image/*.png
+!image/*.jpg

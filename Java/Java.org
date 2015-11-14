@@ -1,0 +1,644 @@
+#+TITLE: Java Class and Object
+
+* Packages
+Example to place class inside a package(/com.horstman.corejava/):
+- add directory, like /c:\classdir/, to environment variable /CLASSPATH/ which contains one or more 
+ directories that are used as roots in a search for /.class/ files.
+- make directory /com\horstman\corejava/ in folder /c:\classdir/
+- create file in /c:\classdir\com\horstman\corejava/
+ 
+  The file name must be the name of the public class in the file followed by /.java/, 
+  so only one public class is allowed in the file.
+- put the name of the package at the top of the file, like /package com.horstman.corejava/, before the code that defines the classes.
+ 
+ The package must live in the directory indicated by its name, which must be a directory that is searchable starting 
+ from the /CLASSPATH/.
+
+A class can use all classes from its own package and all public classes from other package. To use public classes 
+in another package, yuo should use =import= statement or use the full package name.
+
+* Classes and Objects
+Only the primitive types(numbers, characters, and =boolean= values) are not objects.
+
+Class names are nouns that start with an uppercase letter. 
+
+The return value of the =new= operator is a reference to an object stored in heap.
+
+Classes that cannot be extended are called =final= classes. If a class is declared =final=, only the methods, not the 
+fields, are automatically =final=. A =final= field cannot be changed after the object has been constructed.
+
+Since you can cast only within an inheritance hierarchy, you should use =instanceof= to check before casting from 
+a superclass to subclass, by the way, =null= is not instance of any type, =instanceof= for =null= always returns =false=.
+** Access Control
+Four access modifiers are
+- =private=, accessible only in the class itself.
+- default access modifier, accessible in classes in the same package(not in subpackages or enclosing packages) and in the class itself
+- =protected=, accessible in subclasses of the class, in classes in the same package and in the class itself
+- =public=, accessible anywhere the class is accessible
+The =private= and =protected= apply only to members not to classes or interfaces(unless nested). For a member of 
+a class to be accessible, the class must first be accessible.
+** Construction and Initialization
+Construction has 3 phases:
+- invoking a superclass's constructor
+- initialize the fields using their initializers and any initialization blocks
+ 
+ It is not allowed in c++.
+- execute the body of the constructor
+
+If you do not initialize a field, it is automatically initilized to default(0, =false= or =null=).
+
+The process of creating an object
+- Intialize static field using their initializers and any static block when the class is loaded
+ - class is loaded when a static method(including constructors) or a static field of that class is accessed
+ - For each subclass, its base class is loaded firstly
+- if it is a creation of new object
+ - allocate memory on heap, and clear the memory(0 for numbers, =false= for =boolean=, and =null= for referenes)
+ - non-static field initializer and block intialization
+ - constructor
+
+#+begin_src java
+class Employee {
+	static {
+		System.out.println("Employee static block");
+	}
+    public Employee() {
+		System.out.println("Employee constructor");
+    }
+}
+
+class Manager extends Employee {
+	static {
+		System.out.println("Manager static block");
+	}
+    public Manager() {
+		System.out.println("Manager constructor");
+    }
+	
+}
+public class Hello {
+	
+	public static void main(String[] args) {
+		Manager m = new Manager();
+	}
+	static {
+		System.out.println("Hello static block");
+	}
+}
+/* output
+Hello static block
+Employee static block
+Manager static block
+Employee constructor
+Manager constructor
+*/
+#+end_src
+*** Constructor
+Classes could have constructors, constructors have same name as the class, are not methods and have no return type.
+Constructor are not inherited. Constructors(including copy constructor) are called with =new= operator.
+
+constructors can have any of the same access modifier as class member, have annotation.
+One constructor can invoke another constructor from the same class by using =this()=. 
+
+Copy constructor takes an argument of the current object type and constructs the new object to be a copy of the passed 
+in object.
+
+To invoke a superclass's constructor, =super(...)= should be used as the first statement.
+To invoke other constructor within the same class(not allowed in c++), =this(...)= should be used as the first statement.
+Apparently, they conflicted with each other, but that does not mean, it can skip to run a superclass's 
+constructor by calling other constructor of subclass.
+Also it is impossible to catch exceptions thrown by them.
+
+The =this= keyword:
+- denote a reference to the implicit parameter
+- call another constructor for the same class. Like, =this(...)=
+The =super= keyword:
+- invoke a superclass method. Like, =super.method(...)=
+- invoke a superclass constructor. Like =super(...)=
+
+If a constructor neither invoke a superclass's constructor nor invoke other constructor within the same class, 
+the superclass's no-arg constructor is automatically invoked as the first statement. 
+
+Constructors should avoid invoking overridable methods, the only safe methods to call inside a constrcutor are 
+those that are =final= in the base class. This also applies to =private= methods, which are automatically =final=.
+
+For a class without constructor declared, a no-argument constructor is provided to set all fieds to their defaullt 
+values(0, =false= or =null=). If a class supplies at least one constructor, then no-argument constructor is not 
+given automatically.
+*** Initialization Block
+Initialization block can performs initialization of fields, it throws a checked exception only if all of the class's 
+constructors are declared to throw that exception. Multiple blocks executed in the order they appear in the class.
+
+*** Static Block
+Static initialization can performs initialization of static fields, it can not throw any checked exceptions.
+
+** Variables
+Variables includes fields, local variables in a code block, and parameters. 
+
+Annotations can be applied to any variable declaration. apart from annotations, the only modifier can be applied 
+to local variable(or parameter) is =final=.
+
+No default initialization value for local variables wheres fields have default initial values.
+
+The keyword =final= to denote a constant, that is, the =final= variable cannot refer to another object, but does 
+not means the object referred is constant unless the object is type of primitive or immutable class.
+A blank final field must be initialized within an initialization block or constructor. 
+ 
+Unlike c/c++, it does not support =static= local variables. To initialize a static field, either supply an initial 
+value or use a static initialization block. Static initialization occurs when the class is first loaded.
+
+Set up a class constant with the keyword =static final=. 
+** Methods
+The method header consists of an optional set of modifiers, an optional set of type parameters, the method return 
+type, the signature, and an optional =throws= clause listing the exceptions thrown by the method. The method signature 
+consists of the method name and the parameter type list enclosed in parenthese. All methods must have a return type and signature.
+
+All methods are defined inside the class itself.
+
+If you try to use local variable before assigning a value, the compiler will refuse to compile the program.
+
+The method modifiers consist of the following:
+- annotations
+- access modifiers
+- =abstract=, subclass is reponsible for providing a body of a abstract method
+- =static=, it has no =this= pointer. it can be called on an object, but not recomended.
+- =final=
+ - For instance methods, it means the method cannot be overridden in a subclass
+ - For static methods, it means the method can be hidden
+- =synchronized=, related to the control of cocurrent threads
+- =native=
+- =strict=
+An abstract method cannot be =static=, =final=, =synchronized=, or =strict=. A native method cannot be strict.
+
+The last parameter of a method can be declared as a sequence of parameters of a given type, that is called /varargs/. 
+For example, =String ...= is a sequence of zero or more =String= objects. Whenever a /varargs/ is declared, one may 
+either pass a list of arguments to be implicitly packed into an array, or explicitly pass the array directly.
+
+All parameters to methods are passed "by value".
+
+It can declare method parameters to be =final=, meaning that the value of the parameter will not change while the 
+method is executing.
+
+Each class can have a =main= method for convinience to test the class. 
+The =main= method must be =public static void main(String[])=. 
+When running a program, the system locates and runs the =main= method of the program, not all =main= methods 
+in the involved classes. 
+
+Like c++, a method can access the private features of any object of its class.
+
+*** overloading methods
+If a Java base class has a method name that is overloaded several times, redefining that method name in the 
+derived class will not hide any of the base-classs versions(unlike C++). Thus overloading in Java works regardless 
+of whether the method was defined at this level or in a base class.
+
+A fixed-argument method will always be selected over a varargs method. for varargs methods, a sequence parameter 
+=T ...= is treated as being a parameter of type =T[]= for overloading purpose. if 2 signature differ only 
+because one declares a sequence and the other an array, then a compile error occurs.
+
+Even differences in the ordering of arguments are sufficient to distinguish two methods.
+
+The signature does not include the return type or the list of thrown exception, and you cannot overload methods based on these factors.
+
+- find all the methods that have the same name, but different signature
+ - the match is attempted without performing any boxing conversions, and without considering the possibility of a 
+  variable number of arguments, but considering casting of class type and primitive.
+ - if no matches have been found, match is attempted again, but considering boxing conversions.
+ - if no matches have been found, the match is attempted again, but considering variable number of auguments.
+- find the best match
+ - if any method in the set has parameter types that are all assignable to the corresponding parameters of any other 
+  method in the set, then other method is removed from the set because it is a less specific method.
+ - if all remaining methods have the same signature then
+   - if all are abstract, then one is chosen arbitrarily.
+   - if only one is not abstract, then it is chosen.
+   - otherwise, the invocation is ambiguous and invalid.
+
+Once a method has been selected, the method determines the expected return type and possible checked exceptions, 
+if they are not acceptable, then you will get a compile error.
+
+*** Native Method
+Native methods can be invoked from java but is written in a "native" language, usually c/c++. 
+
+They can be overloaded, overridden, =final=, =static=, =synchronized=, =public=, =protected=, or =private=.
+
+They can be implemented using API provided by the people who wrote the virtual machine.
+
+** Inheritance
+All inheritance in Java is public inheritance.
+
+For overriding a method of superclass object, the signature must be identical but the return type can vary in a 
+particular way. if the return type is a reference type, then the overriding method can declare a return type that 
+is subtype of that declared by the superclass method. if the return type is primitive type, then the return type of 
+the overriding method must be identical to that of the superclass method.
+
+For overriding in a varargs method, a sequence parameter of type =T...= is treated as the same as =T[]=.
+
+The overriding method is also allowed to change method modifiers. the =synchronized=, =native=, and =strictfp= can 
+be freely varied. the overriding method can be =final= while the superclass method overridden can not be. The overriding method can 
+be =abstract= even though the superclass method was not. An instance method cannot have the same signature as an 
+inherited static method, and vice versa.
+
+A subclass can change if a parameter in an overriding method is =final=.
+The overriding method's exception list can be different from that of the superclass method's as long as every exception 
+type listed in the overriding method is the same as or a subtype of the exceptions listed in the superclass's methods.
+The exception list of an overriding method can have fewer types listed than the method in the superclass, or more 
+specific types, or both. the overriding method can even have no exception list.
+
+When you override a method, the subclass method must be at least as visible as the superclass method.
+
+Once a method is overriden in a subclass, you cannot invoke it on an instance of the subclass (except from within the 
+subclass, by using the =super= keyword).
+
+Fields cannot be overridden, they can only be hidden. 
+To access the hidden field of superclass, you can use =super=, that is similar to access the overriden method of superclass. 
+Also you can access the hidden field by casting the subclass instance to a superclass in which the field is not hidden.
+
+Dynamic binding is the default behavior, but it does not apply on method decorated with =private=, =static= or =final=.
+
+The type of the reference, not the actual class of the object, determines which class's field is accessed.
+The actual class of object, not the type of the reference, governs which version of the method is called.
+#+begin_src java
+class Supershow {
+	public String str = "superstr";
+	Supershow() { str(); }
+	public void show() {
+		str();
+	}
+	public void str() {
+		system.out.println("Supershow: " + str);		
+	}
+}
+
+class Extendshow extends Supershow{
+	public string str = "Extendstr";
+	Extendshow() {str();}
+
+	public void str() {
+       /*a reference to a field always refers to the field declared in the class in which the method is declared,
+         or else to an inherited field if there is no declaration in that class*/
+	   system.out.println("Extendshow: " + str);		
+	}
+}
+
+public class Hello {	
+	public static void main(string[] args) throws Exception {
+		Extendshow ext = new Extendshow();
+		Supershow sup = ext;
+
+		ext.show();
+		sup.show();
+        
+		system.out.println("sup.str = " + sup.str);
+		system.out.println("ext.str = " + ext.str);
+	}
+}
+
+/*output
+extendshow: null
+extendshow: extendstr
+extendshow: extendstr
+extendshow: extendstr
+sup.str = superstr
+ext.str = extendstr
+*/
+#+end_src
+
+A method can be overridden only if it is accessible. If the method is not accessible then it is not inherited, and 
+if it is not inherited it can't be overridden.
+
+Static members within a class, whether fields or methods, cannot be overridden, they are always hidden.
+
+An invocation of =super.method= always uses the implementation of =method= the superclass defines(or inherits), it 
+does not use any overriding implementation of that method further down the class hierarchy.
+#+begin_src java
+class Base {
+  protected string name() {
+    return "base";
+  }
+}
+
+class More extends Base {
+  protected string name() {
+    return "more";
+  }
+  
+  protected void printname() {
+    Base sref = (Base) this;
+ 
+    system.out.println("this.name() = " + this.name());
+    system.out.println("sref.name() = " + sref.name());
+    system.out.println("super.name() = " + super.name());
+  }
+}
+
+/*output
+this.name() = more
+sref.name() = more
+super.name() = base
+*/
+#+end_src
+** cloning objects
+Three important factors in writing a clone method:
+- empty =cloneable= interface, which you must implement to provide a clone method that can be used to clobe an object.
+- =clone= method implemented by the =Object= class, which copy all fields of the original object to the new one, it 
+ may need to override the method.
+- =CloneNotSupportedException=, to signal a class's =clone= method should not have been invoked.
+
+To override =clone= method, you need to invoke =super.clone()= firstly, then write special code to deal 
+with fields for which copying the value is incorrect, like object of type =Array=, =String=, or other class.
+
+Ff =clone= method of a class does not use =super.clone()=, but use =new= to create an object of the class, 
+then the extended class's invocation of =super.clone()= would give an object of the base class, not anobject of 
+the correct, extended type.
+
+Cloning is an alternative form of construction but is not recognized as construction by the system, that means, 
+you have to be aware of using /blank finals/ that can be set only in constructors, but, since =Object.clone()= 
+will be called eventually, the value of =final= field will be a copy of the value in the object being cloned.
+
+one advantage the copy constructor has is that it can deal with =final= fields in situations where =clone= cannot. 
+=Aclass a = new Aclass(objectOfAclass); Aclass a = objectOfAclass.clone();=
+
+Serialization can provide a way to make deeper copies than those provided by =Object.clone=.
+
+** Abstract Class
+Abstract classes cannot be instantiated. You still can create object variable of an abstract class, but such a 
+variable should refer to an object of a nonabstract subclass.
+
+In addition to abstract methods, abstract classes can have fields and concrete methods.
+
+A class with one or more abstract methods must itself be declared =abstract=. A class can even be declared as =abstract= 
+even though it has no abstract methods.
+
+You can leave some or all of the abstract methods undefined in subclass, then you must tag the subclass as abstrct 
+as well.
+
+** Interface
+An interface can extend one or more other interface using =extends=.
+
+While each class can have only one superclass(Abstract Class belong to class), classes can implement multiple interfaces.
+Just as you use =instanceof= to check if an object is of a specific class, you can use it to check if an 
+object implements an interface.
+
+The =instanceof= operator requires that if both operands are class types, one must be a subtype of the other, otherwise, 
+it will introduce of compile error.
+
+Interface modifiers:
+- annotations
+- =public=, whithout it, an interface is only accessible within its own package
+- =abstract= by default
+- =strictfp=
+
+Reference of interface type can be used only to access members of that interface. 
+#+begin_src java
+Comparable<point> obj = new Point();
+double dist = obj.distance(p1); // invalid: comparable has no distance method
+#+end_src
+in addition, it can also access method of =Object=, because no matter what interface the object implements, it is always an 
+=Object= and so has those methods.
+
+an interface can declare three kinds of members:
+- constants(fields)
+ 
+ implicitly =public static final=. must have initializers, blank finals are not permitted.
+- methods
+
+ implicitly =abstract= and =public=. cannot be =final=, =static=, and other method modifiers. 
+- nested classes and interfaces
+  
+  implicitly =public=.
+
+If an interface declares a constant of the same name as an inherited constant, regardless of their types, then the 
+new constant hides the inherited one. the inherited constant can still be accessed through the interface name followd 
+by dot and then the constant name.
+
+the class's own =static= fields can hide the inherited fields of the interfaces it implements or the class it extends.
+
+As with overriding in class extension, the overriding method is not permitted to throw more checked exceptions than 
+the method it overrides.
+
+The eventual class implementation should provide a method body for each of the overloaded forms.
+
+When overriding, method in subinterface has the same signature as that in superinterface, and return type should 
+be the same(or covariant) as return type of method in superinterface. "the same, or covariant, return type" means, 
+if the return type of subinterface is a reference, then it should be subtype of return type of superinterface's 
+method; if the return type of subinterface is a primitive, then it must be identical to that of superinterface's 
+method. if two inherited methods differ only inreturn type where one type is not a subtype of the other, you will 
+get a compile-time error.
+
+Marker interfaces has neither methods nor constants, just to mark a class as having some general property, but they 
+are important.
+
+Two major different between interfaces and abstract classes:
+- a class can implement multiple interfaces while it can only extends one other class, even if the class is abstract.
+- a abstract class can have a partial implementation, protected parts, static methods, and so on, wheres interfaces 
+ are limited to public constants and public methods with no implementation.
+
+** Nested Classes and Interfaces
+Normally, you cannot put any code inside an interface, but a nested class can be part of an interface, and any 
+class put inside an interface is automatically =public= and =static=.
+
+It does not matter how
+*** Static Nested Types
+Static nested classes are members of their enclosing type.
+
+The name of a nested type is /enclosingname.nestedname/, the nested type is accessible only if the enclosing type 
+is accessible. 
+
+For classes, a static nested class or interface could have private, package, protected, or public access.
+For interfaces, nested type are implicitely public.
+
+Static nested types can access all other members of the enclosing type including private one through an appropriate 
+object reference.
+
+Nested interfaces are always static, by convention, the =static= modifier is omitted.
+
+*** Inner Classes
+Non-static nested classes are called inner classes, they are associated with instance of a enclosing class.
+
+Inner classes cannot have static members(including static nested types), except for final static fields that are 
+initialized to constants or expressions built up from constants.
+
+Inner classes can extend any other class including its enclosing class, implement any interface and be extended by 
+any other class.
+
+An inner class can be declared =final= and =abstract=, and have annotations.
+Only Inner classes(interfaces) can be =private=. When =protected= is applied to an inner class, nothing but outer 
+class, classes in the same package, and the inheritors of the outer class can access the inner class.
+
+A nested class can access all members of its enclosing class, no matter how deeply an inner class may be nested, 
+including private fields and methods without qualification. The enclosing class can access the private members 
+of the inner class, but only by an explicit reference to an inner class object.
+
+If the enclosing class of the inner subclass does not extend the enclosing class of the inner class, or if the inner 
+subclass is not itself an inner class, then an explicit reference to an object of the enclosing class of the inner 
+class must be supplied when the constructor of the inner class is invoked via =super= in constructor of the enclosing 
+class of the inner subclass. example
+#+begin_src java
+class Outer {
+  class Inner {}
+}
+
+class Unrelated extends Outer.Inner {
+  unrelated(Outer ref) {
+    ref.super();
+  }
+}
+#+end_src
+/EnclosingClass.this/ denotes the outer class reference. 
+
+An inner class's own fields and methods(and nested types) can hide those of the enclosing object by two ways:
+- a field or method is declared in the inner class
+- a field or method is inherited by the inner class
+
+An inner class method with the same name as an enclosing class method hides all overloaded forms of the enclosing 
+class method, even if the inner class itself does not declare those overload forms.
+
+Inner classes can be hidden from other classes in the same package.
+
+You must use an object of the enclosing class to make an object of the inner class.
+#+begin_src java
+class Outer {
+	private int v;
+	
+	class Inner{
+		public Outer outer(){
+			return Outer.this;
+		}
+		public void g(int i) { v = i; }
+	}
+
+	public Inner inner(){
+		return new Inner();
+	}
+	
+	public void f() { System.out.println("v: "+v); }
+}
+
+public class Hello {
+	public static void main(String[] args) {
+		Outer outer = new Outer();
+		Outer.Inner inner1 = outer.inner();
+		inner1.g(1);
+		inner1.outer().f(); // v: 1
+
+		Outer.Inner inner2 = outer.new Inner();
+		inner2.g(2);
+		inner2.outer().f(); // v: 2
+		inner1.outer().f(); // v: 2
+	}
+}
+#+end_src
+*** Local Inner Classes
+Local inner classes are defined in code blocks, they are not member of the class of which the code is a part but are 
+local to that block, and completely inaccessible outside the block. They cannot have access modifiers, not can they 
+be declared =static=. they can have annotations. 
+
+They can access all the variables that are in scope where the class is defined, including local variables, method 
+parameters, instance variables, and static variables. The only restriction is that a local variable or method 
+parameter can be accessed only if it is declared =final=. They can have annotations.
+
+Members of local inner classes can hide the local variables and parameters of the block they are declared in, just 
+as they can hide instance fields and methods. Once a local variable or parameter has been hidden it is impossible 
+to refer to it.
+
+*** Anonymous Inner Classes
+Anonymous classes are defined in the =new= expression itself, as part of a statement. The type(interface or class) 
+specified to =new= is the supertype of the anonymous class, and if the supertype is class, then the construction 
+parameters can be given to the superclass constructor.
+
+An anonymous class cannot have an explicit =extends= or =implements= clause, nor can it have any modifiers, 
+including annotations. It cannot have explicit construction declared because they have no name to give the constructor. 
+It can have initialization blocks.
+
+/Double brace initialization/:
+#+begin_src java
+//the inner braces are an object construction block
+new ArrayList<String>(){{add("Harry"); add("Tony")};};
+#+end_src   
+
+** Object Class
+The =Object= class is the root of the class hierarchy, and it defines a number of methods, like
+=public boolean equals(Object obj)=, =public int hascode()=, =protected Object clone() throws CloneNotSupportedException=, 
+=public final Class<?> getClass()=, =public String toString()=.
+The =equals= method implemented in =Object= class determines if two object references are identical.
+
+The =clone= method of =Object= throws an exception if the object does not implement the interface =Cloneable=. By 
+the way, =Object= itself does not implements that interface.
+
+If =a.equals(b)=, then /a/ and /b/ must have the same hash code.
+Example to write the =equals= method and the =hasCode= method:
+#+begin_src java
+public class Employee
+{
+   private String name;
+   private double salary;
+   private Date hireDay;
+
+   public Employee(String n, double s, int year, int month, int day)
+   {
+      name = n;
+      salary = s;
+      GregorianCalendar calendar = new GregorianCalendar(year, month - 1, day);
+      hireDay = calendar.getTime();
+   }
+   
+   @Override public boolean equals(Object otherObject)
+   {
+      // a quick test to see if the objects are identical
+      if (this == otherObject) return true;
+
+      // must return false if the explicit parameter is null
+      if (otherObject == null) return false;
+
+      // if the classes don't match, they can't be equal
+      if (getClass() != otherObject.getClass()) return false;
+
+      // now we know otherObject is a non-null Employee
+      Employee other = (Employee) otherObject;
+
+      // test whether the fields have identical values
+      // "==" operator for primitives, Object.equals for object fields
+      return Objects.equals(name, other.name) && salary == other.salary && Objects.equals(hireDay, other.hireDay);
+   }
+   // if you redefined the equals method, you should also need to redefine the hasCode method
+   @Override public int hashCode()
+   {
+      return Objects.hash(name, salary, hireDay); 
+   }
+}
+
+public class Manager extends Employee
+{
+   private double bonus;
+
+   public Manager(String n, double s, int year, int month, int day)
+   {
+      super(n, s, year, month, day);
+      bonus = 0;
+   }
+
+   @Override public boolean equals(Object otherObject)
+   {
+      // if redefine equals in a subclass, call super.equals
+      // and super.equals has checked they belong to the same class.
+      if (!super.equals(otherObject)) return false;
+
+      Manager other = (Manager) otherObject;
+      return bonus == other.bonus;
+   }
+   // if you redefined the equals method, you should also need to redefine the hasCode method
+   @Override public int hashCode()
+   {
+      return super.hashCode() + 17 * new Double(bonus).hashCode();
+   }
+}
+#+end_src
+
+For every class, you need to decide if
+- the default =clone= method is good enough
+- the default =clone= method can be patched up by calling =clone= on the mutable subobjects
+- =clone= should not be attempted
+The third option is actually the default. To choose either the first or the second option, a class must 
+- implement the =Cloneable= interface, and 
+- redefine the =clone= method with the =public= access modifier.
+
+
+
