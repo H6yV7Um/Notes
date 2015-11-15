@@ -1,16 +1,16 @@
-#+TITLE: GitÂã°æ±¾¿â
+#+TITLE: Gitè£¸ç‰ˆæœ¬åº“
 
 * Why
-ÊÇÎªÁË×÷Îª±¸·İµÄ°æ±¾¿â»òÕß¹²ÏíÊ½µÄ°æ±¾¿âÊ¹ÓÃµÄ¡£ 
-²»½öÄÜ½ÚÊ¡´æ´¢¿Õ¼ä£¨Ã»ÓĞ¹¤×÷ÇøºÍÔİ´æÇø£©£¬¶øÇÒ±ãÓÚÊ¹ÓÃgit pushÏòÆäÍÆËÍ¸üĞÂ¡£
+æ˜¯ä¸ºäº†ä½œä¸ºå¤‡ä»½çš„ç‰ˆæœ¬åº“æˆ–è€…å…±äº«å¼çš„ç‰ˆæœ¬åº“ä½¿ç”¨çš„ã€‚ 
+ä¸ä»…èƒ½èŠ‚çœå­˜å‚¨ç©ºé—´ï¼ˆæ²¡æœ‰å·¥ä½œåŒºå’Œæš‚å­˜åŒºï¼‰ï¼Œè€Œä¸”ä¾¿äºä½¿ç”¨git pushå‘å…¶æ¨é€æ›´æ–°ã€‚
 * What
-´´½¨Ò»¸öÂã°æ±¾¿â
+åˆ›å»ºä¸€ä¸ªè£¸ç‰ˆæœ¬åº“
 #+begin_src git
 $ git clone --bare ./git-exercise/ git-exercise-backup
 Cloning into bare repository 'git-exercise-backup'...
 done.
 #+end_src
-ÓëÔ­°æ±¾¿â×÷±È½Ï
+ä¸åŸç‰ˆæœ¬åº“ä½œæ¯”è¾ƒ
 #+begin_src git
 $ diff ./git-exercise/.git/ ./git-exercise-backup/
 Only in ./git-exercise/.git/: COMMIT_EDITMSG
@@ -31,10 +31,10 @@ Common subdirectories: ./git-exercise/.git/objects and ./git-exercise-backup/obj
 Only in ./git-exercise-backup/: packed-refs
 Common subdirectories: ./git-exercise/.git/refs and ./git-exercise-backup/refs
 #+end_src
-ÕâÀï£¬¾Í¿ÉÒÔ¿´µ½£¬
-- Âã°æ±¾¿âÖĞÃ»ÓĞÄ¿Â¼index£¬Ò²¼´£¬Ã»ÓĞÔİ´æÇø
-- Âã°æ±¾¿âÖĞÃ»ÓĞÄ¿Â¼logs,¹Êgit reflog²»¿ÉÓÃ
-- Âã°æ±¾¿âÖĞ¶àÁËÎÄ¼şpacked-refs
+è¿™é‡Œï¼Œå°±å¯ä»¥çœ‹åˆ°ï¼Œ
+- è£¸ç‰ˆæœ¬åº“ä¸­æ²¡æœ‰ç›®å½•indexï¼Œä¹Ÿå³ï¼Œæ²¡æœ‰æš‚å­˜åŒº
+- è£¸ç‰ˆæœ¬åº“ä¸­æ²¡æœ‰ç›®å½•logs,æ•…git reflogä¸å¯ç”¨
+- è£¸ç‰ˆæœ¬åº“ä¸­å¤šäº†æ–‡ä»¶packed-refs
 #+begin_src git
 $ cat packed-refs
 # pack-refs with: peeled
@@ -46,7 +46,7 @@ committer tech-note <Email Addr> 1361946631 +0800
 
 start
 #+end_src
-³¢ÊÔ¼¸¸öÃüÁî
+å°è¯•å‡ ä¸ªå‘½ä»¤
 #+begin_src git
 $ cd ./git-exercise-backup/
 $ ls -l
@@ -74,7 +74,7 @@ $ git checkout HEAD
 fatal: This operation must be run in a work tree
 #+end_src
 * How to use
-ÏÈ¸üĞÂÏÂÔ­°æ±¾
+å…ˆæ›´æ–°ä¸‹åŸç‰ˆæœ¬
 #+begin_src git
 $ cd ../git-exercise
 $ cat 1st.txt
@@ -84,7 +84,7 @@ $ git add .
 $ git commit -m "hello"
 686db8a] hello
 #+end_src
-³¢ÊÔ½«¸üĞÂÍÆËÍµ½±¸·İµÄÂã°æ±¾¿â
+å°è¯•å°†æ›´æ–°æ¨é€åˆ°å¤‡ä»½çš„è£¸ç‰ˆæœ¬åº“
 #+begin_src git
 $ git push
 fatal: No configured push destination.
@@ -96,8 +96,8 @@ and then push using the remote name
 
     git push <name>
 #+end_src
-Ê§°ÜÁË£¡ÒòÎªÎ´Éè¶¨Ô¶³Ì°æ±¾¿â¡£ 
-ÔÙ´Î³¢ÊÔ
+å¤±è´¥äº†ï¼å› ä¸ºæœªè®¾å®šè¿œç¨‹ç‰ˆæœ¬åº“ã€‚ 
+å†æ¬¡å°è¯• 
 #+begin_src git
 $ git push ../git-exercise-backup/
 warning: push.default is unset; its implicit value is changing in
@@ -120,7 +120,7 @@ Total 3 (delta 0), reused 0 (delta 0)
 To ../git-exercise-backup/
    72c4cc5..686db8a  master -> master
 #+end_src
-ÉÏÃæÒ»´ó¶ÎÌáÊ¾£¬ÊÇÔÚËµ£¬Ó¦¸ÃÉèÖÃÒ»¸öÄ¬ÈÏµÄÍÆËÍ£¨push£©Ä¿µÄµØ£¬ÕâÑù£¬¾Í¿ÉÒÔÖ±½ÓÓÃgit pushÁË£¡ÕâÀïµ½µ×³É¹¦ÁËÂğ£¿
+ä¸Šé¢ä¸€å¤§æ®µæç¤ºï¼Œæ˜¯åœ¨è¯´ï¼Œåº”è¯¥è®¾ç½®ä¸€ä¸ªé»˜è®¤çš„æ¨é€ï¼ˆpushï¼‰ç›®çš„åœ°ï¼Œè¿™æ ·ï¼Œå°±å¯ä»¥ç›´æ¥ç”¨git pushäº†ï¼è¿™é‡Œåˆ°åº•æˆåŠŸäº†å—ï¼Ÿ
 #+begin_src git
 $ git log
 commit 686db8a064b6a2cf1b1dc899a0cb1175d63871dd
@@ -148,8 +148,8 @@ Date:   Wed Feb 27 14:30:31 2013 +0800
 
     start
 #+end_src
-Ã÷ÏÔÊÇ³É¹¦ÁË£¡ÒòÎªÂã°æ±¾¿âµÄÈÕÖ¾¸üĞÂÁË¡£
-ÄÇÃ´µ±ÎÒÃÇÉÏÊöÔ­Ê¼°æ±¾¶ªµôºó£¬ÔõÃ´Ê¹ÓÃ¸ÃÂã°æ±¾¿â»Ö¸´³öÒ»¸öÓĞ¹¤×÷ÇøµÄ¡¢¿ÉÕı³£Ê¹ÓÃµÄ°æ±¾ÄØ£¿ ´ğ°¸ÈçÏÂ£¬
+æ˜æ˜¾æ˜¯æˆåŠŸäº†ï¼å› ä¸ºè£¸ç‰ˆæœ¬åº“çš„æ—¥å¿—æ›´æ–°äº†ã€‚
+é‚£ä¹ˆå½“æˆ‘ä»¬ä¸Šè¿°åŸå§‹ç‰ˆæœ¬ä¸¢æ‰åï¼Œæ€ä¹ˆä½¿ç”¨è¯¥è£¸ç‰ˆæœ¬åº“æ¢å¤å‡ºä¸€ä¸ªæœ‰å·¥ä½œåŒºçš„ã€å¯æ­£å¸¸ä½¿ç”¨çš„ç‰ˆæœ¬å‘¢ï¼Ÿ ç­”æ¡ˆå¦‚ä¸‹ï¼Œ 
 #+begin_src git
 $ git clone git-exercise-backup/ from-git-exercise-backup/
 Cloning into 'from-git-exercise-backup'...
@@ -173,3 +173,4 @@ Date:   Wed Feb 27 14:30:31 2013 +0800
 
     start
 #+end_src
+ 

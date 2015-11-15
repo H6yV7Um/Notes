@@ -1,16 +1,10 @@
-#+HTML_HEAD: <link rel="stylesheet" type="text/css" href="css/norang.css" />
-##+STYLE: <link rel="stylesheet" type="text/css" href="css/worg-zenburn.css" />
-#+OPTIONS: email:t
-#+LINK_HOME: ../public_html/sitemap.html
-#+TITLE: Nokogiri�������ж�������ռ��XML�ļ�
-#+AUTHOR: Howard Hou
-#+EMAIL: howard.hou@ericsson.com
+#+TITLE: Nokogiri解析含有多个命名空间的XML文件
 
-��ʹ�� Nokogiri::XML::Documen �� at(), xpath() �������ܻ��XML�ļ��е�Ԫ�أ�element��ʱ�����ܵ�ԭ����ǣ���XML�ļ��д��ڵĶ�������ռ����¡����ڸ����⣬Nokogiri����������취�� 
+当使用 Nokogiri::XML::Documen 的 at(), xpath() 方法不能获得XML文件中的元素（element）时，可能的原因就是，该XML文件中存在的多个命名空间所致。对于该问题，Nokogiri有两个解决办法。 
 
-��һ��ʹ���� Nokogiri::XML::Document �� remove\_namespaces! ����ǿ��ɾ��XML�ļ��е����������ռ䣬Ȼ��Ϳ���ʹ�� at(), xpath() �����õ���ص�Ԫ�أ�element���ˡ� 
+其一，使用类 Nokogiri::XML::Document 的 remove\_namespaces! 方法强制删除XML文件中的所有命名空间，然后就可以使用 at(), xpath() 方法得到相关的元素（element）了。 
 
-�����ʹ�ø���ķ��� collect\_namespaces() �õ�XML�ļ���ȫ���������ռ䣬Ȼ�󣬽�����Ϊ at(), xpath() �����ĵڶ����������롣Ϊ����ʹ�ã����������´���Ϊ�� Nokogiri::XML::Document �������������� get\_element() �� get\_elements() 
+其二，使用该类的方法 collect\_namespaces() 得到XML文件中全部的命名空间，然后，将其作为 at(), xpath() 方法的第二个参数传入。为方便使用，可以用以下代码为类 Nokogiri::XML::Document 增加了两个方法 get\_element() 和 get\_elements() 
 #+begin_src ruby
 require 'nokogiri'
 
@@ -39,5 +33,5 @@ module Nokogiri
 end
 #+end_src
 
-�ο�����
+参考文章
 - [[http://biztech.sheprador.com/?p=74][Using Nokogiri to Parse XML with Multiple Namespaces]]

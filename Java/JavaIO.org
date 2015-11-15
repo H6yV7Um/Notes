@@ -7,7 +7,7 @@ String name = in.nextLine(); // to read a line
 String firstName = in.next(); //next word
 int age = in.nexctInt(); // to read an integer
 #+end_src
-
+ 
 Formatting output
 #+begin_src java
 System.out.printf("Hello %s. Your age: %d.", name, age);

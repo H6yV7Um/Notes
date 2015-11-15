@@ -1,12 +1,6 @@
-#+HTML_HEAD: <link rel="stylesheet" type="text/css" href="css/norang.css" />
-##+STYLE: <link rel="stylesheet" type="text/css" href="css/worg-zenburn.css" />
-#+OPTIONS: email:t
-#+LINK_HOME: ../public_html/sitemap.html
-#+TITLE: ÅúÁ¿Ìæ»»ÎÄ¼þÃû¼°ÎÄ¼þÄÚÈÝ
-#+AUTHOR: Howard Hou
-#+EMAIL: howard.hou@ericsson.com
+#+TITLE: æ‰¹é‡æ›¿æ¢æ–‡ä»¶ååŠæ–‡ä»¶å†…å®¹
 
-¸Ãruby³ÌÐòÓÃÀ´£¬ÅúÁ¿Ìæ»»Î»ÓÚÄ³ÎÄ¼þ¼ÐÏÂ£¬·ûºÏÄ³¹æÔòµÄÎÄ¼þÃû¼°ÎÄ¼þÖÐµÄÄÚÈÝ¡£
+è¯¥rubyç¨‹åºç”¨æ¥ï¼Œæ‰¹é‡æ›¿æ¢ä½äºŽæŸæ–‡ä»¶å¤¹ä¸‹ï¼Œç¬¦åˆæŸè§„åˆ™çš„æ–‡ä»¶ååŠæ–‡ä»¶ä¸­çš„å†…å®¹ã€‚
 #+begin_src ruby
 require 'FileUtils'
 

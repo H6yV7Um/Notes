@@ -2,7 +2,7 @@
 
 An exception object is always an instance of a class derived from =Throwable=, 
 =Throwable= is splited into two branches: =Error= and =Exception=.
-
+ 
 There are two kinds of excepton: unckecked exceptions and checked exceptions. Exceptions of type 
 =RuntimeException=, =Error=, or subclasses of these types are unchecked exceptions and can be
 thrown anywhere without being declared, but it can be caught, like =RuntimeException=.

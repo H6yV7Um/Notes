@@ -1,0 +1,82 @@
+#+TITLE: Cygwin的使用
+
+* cygwin下访问windows盘符
+** 查看windows盘符在cygwin下的映射
+#+begin_src sh
+$ mount
+C:/cygwin/bin on /usr/bin type ntfs (binary,auto)
+C:/cygwin/lib on /usr/lib type ntfs (binary,auto)
+C:/cygwin on / type ntfs (binary,auto)
+C: on /cygdrive/c type ntfs (binary,posix=0,user,noumount,auto)
+D: on /cygdrive/d type ntfs (binary,posix=0,user,noumount,auto)
+E: on /cygdrive/e type ntfs (binary,posix=0,user,noumount,auto)  
+#+end_src
+** cygpath命令的使用
+#+begin_src sh
+$ cygpath -u c:\\Windows
+/cygdrive/c/Windows
+$ cygpath -w /cygdrive/c/Windows
+C:\Windows
+#+end_src
+* cygwin中用户主目录不一致问题
+** 问题描述
+如果其他软件(如msysGit)为windows设置了HOME环境变量, 会影响到Cygwin中用户主目录的设置, 甚至会造成在Cygwin中的不同命令有不同的用户主目录的情况。
+
+cygwin确定用户主目录的依据是，先查看系统的HOME环境变量, 再查看/etc/passwd中为用户设置的主目录. 而有些cygwin应用(如SSH)却没有先查看HOME环境变量, 而是直接使用/etc/passwd中设置的用户主目录.
+** 解决办法
+不要让其他软件设置的HOME环境变量影响cygwin, 在C:\cygwin\Cygwin.bat的开头添加 set HOME=
+* 命令行自动补齐忽略文件名大小写
+windows的文件系统是忽略文件名的大小写的。
+
+为使用方便，最好让cygwin的命令行补齐功能也忽略大小写。编辑文件~/.inputrc，删除掉 #set completion-ignore-case on其中的 #，再重新进入cygwin。
+* 安装新软件git
+重新打开安装cygwin时的setup.exe。在搜索框中输入git，然后选择相关的软件，如，
+- git， git-gui， git-svn， gitk， stgit
+- git-completion：Git命令的自动补齐功能
+- openssh：SSH客户端，因有些git仓库是需要SSH服务访问的
+- vim: Git的默认编辑器
+** 忽略文件权限的可执行位
+默认，git会跟踪文件的可执行位，但对windows平台而言，这是没用的，甚而是有害的，因为windows平台的其他软件或操作可能会破坏文件的可执行位。
+
+可通过命令禁止git对文件权限的跟踪。
+
+=git config --system core.fileMode false=
+
+这样，已添加到库中的文件的权限在本地改变时，git不会更新库中的相应文件。
+** 对中文的支持
+版本1.7.x后的Cygwin能很好的支持中文（用locale命令可查看支持的字符），但msysgit的shell环境仍然需要相关的配置。 
+同linux平台一样，文件名称中包含中文的文件，在工作区状态输出时，中文文件名不能正常显示，而是用八进制字符显示的，为了解决此问题，可执行
+
+=git config --global core.quotepath false=
+** SSH服务
+以公钥认证的方式访问Git服务器，是实现Git写操作的最重要的服务。 
+
+使用如下命令来生成SSH公钥、私钥对：
+
+=$ssh-keygen –C “emailAddress” –t rsa=
+
+上述命令执行中，一路选择回车，会生成/home/Administrator/.ssh/。 
+但是，cygwin下的openssh有一个bug： 使用git克隆来自SSH协议版本库时，偶尔会中断,致使克隆失败。解决办法是，使用plink，具体如下：
+*** 安装putty
+putty是windows下的开源软件，提供SSH客户端服务，还包括管理公钥的相关工具。
+
+下面几个包含在安装目录中的程序，用于与Git整合， 
+- plink.exe，命令行的SSH客户端，用于替代ssh命令。 
+- puttygen，管理putty格式的私钥，也可用于将openssh的私钥转换为putty格式的私钥。 
+- pageant， ssh认证代理，运行于后台，负责为ssh连接提供私钥访问服务。
+*** 密钥转换
+将openssh格式的私钥转换为putty格式的私钥。 
+打开puttygen，加载/home/Administrator/.ssh/id\_rsa,会有窗口弹出转换成功的提示，在关闭提示回到puttygen界面后，选择保存私钥，起名为 id\_rsa.ppk，保存在/home/Administrator/.ssh中。
+*** 设置plink为SSH服务器的客户端
+创建脚本文件/bin/ssh-client-plink，内容为：
+#+begin_src sh
+#!/bin/sh
+/cygwin/c/Program \Files \(x86)/PuTTY/plink.exe –T –i C:/cygwin/home/Administrator/.ssh/id_rsa.ppk $*
+#+end_src
+当git访问ssh服务器时，为使上述脚本被自动调用，执行：=export GIT_SSH=/bin/ssh-client-plink=
+*** 测试
+#+begin_src sh
+$ssh –T git@github.com
+Hi usernameOngithub! You’ve successfully authenticated…..
+#+end_src
+注意，测试之前应将公钥复制到个人github网页的SSH KEYS中。

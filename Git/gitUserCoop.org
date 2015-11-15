@@ -1,6 +1,6 @@
-#+TITLE: Git�û�Э��
+#+TITLE: Git用户协作
 
-��������
+问题引出
 #+begin_src git
 $ git init --bare ./git-share.git
 Initialized empty Git repository in c:/Documents and Settings/lhou/git-share.git/
@@ -41,12 +41,12 @@ hint: its remote counterpart. Merge the remote changes (e.g. 'git pull')
 hint: before pushing again.
 hint: See the 'Note about fast-forwards' in 'git push --help' for details.
 #+end_src
-Ϊʲôgit-user2�����İ汾������(git push)�����¸���ʱ��ʧ�����أ� 
+为什么git-user2向共享的版b本库推送(git push)其最新更新时，失败了呢？ 
 
-��Ϊ���Ƿǿ��ʽ���ͣ�non-fast-forward���� 
-���ʽ����ָҪ���͵ı��ذ汾����ύ�ǽ�����Զ�̰汾����Ӧ��֧�������ύ�����ϵģ�Ҳ��Զ�̰汾����Ӧ��֧�������ύӦ���Ǳ��ذ汾�������ύ�������ύ�� 
-
-�������£�
+因为这是非快进式推送（non-fast-forward）！ 
+快进式推送指要推送的本地版本库的提交是建立在远程版本库相应分支的现有提交基础上的，也即远程版本库相应分支的最新提交应该是本地版本库最新提交的祖先提交。 
+ 
+详情如下，
 #+begin_src git
 $ git log
 commit ae6e8ee8c49c14b864911b2acf782d075da09875
@@ -62,9 +62,9 @@ Date:   Thu Feb 28 10:58:11 2013 +0800
 
     user1.txt
 #+end_src
-���������ʾ��git-share.git�������ύ��55a3ee,��git-user2��û�п�������ύ����Ϊ����û����git-user2��ִ��git pull�����ƵĲ���������55a3ee����ύ��û�г�Ϊgit-user2�����ύae6e8e�������ύ�������Ƿǿ��ʽ�ύ�� 
+上面输出显示，git-share.git的最新提交是55a3ee,而git-user2并没有看到这个提交，因为根本没有在git-user2中执行git pull或类似的操作，所以55a3ee这个提交就没有成为git-user2最新提交ae6e8e的祖先提交，故这是非快进式提交。 
 
-����취���Ǻϲ������ύ���������£�
+解决办法就是合并后在提交。具体如下，
 #+begin_src git
 $ cd ../git-user2/
 $ git pull
@@ -98,10 +98,10 @@ Date:   Thu Feb 28 10:58:11 2013 +0800
 
     user1.txt
 $ git log --graph --oneline
-*   053877f Merge branch 'master' of c:/Documents and Settings/lhou/./git-share
+\*   053877f Merge branch 'master' of c:/Documents and Settings/lhou/./git-share
 |\
 | * 55a3ee5 user1.txt
-* ae6e8ee user2.txt
+\* ae6e8ee user2.txt
 $ git push
 warning: push.default is unset; its implicit value is changing in
 Git 2.0 from 'matching' to 'simple'. To squelch this message
@@ -125,20 +125,20 @@ Total 5 (delta 0), reused 0 (delta 0)
 To c:/Documents and Settings/lhou/./git-share.git/
    55a3ee5..053877f  master -> master
 #+end_src
-���Կ�����
-- git pull��������������
-  - ��ȡԶ�̰汾��������ύae6e8ee
-  - �뱾���ύ�ϲ�,�ϲ����ύID��053877
-- git push�ɹ��������
-��ʵ�ϣ��ڷǿ��ʽ���Ͳ��ɹ�������£�����ͨ��-f������ǿ�����͵ģ������ǲ�����ģ���ô��ν�ֹ�ǿ��ʽ���ͣ�����ǿ�����ͣ��أ�
-- ���ð汾��
-#+begin_src git
+可以看出，
+- git pull包含了两个动作
+  - 获取远程版本库的最新提交ae6e8ee
+  - 与本地提交合并,合并的提交ID是053877
+- git push成功完成推送
+事实上，在非快进式推送不成功的情况下，可以通过-f参数来强制推送的，但这是不建议的，那么如何禁止非快进式推送（包括强制推送）呢？
+- 配置版本库
+#+BEGIN_SRC git
 $ pwd
 /c/Documents and Settings/lhou/git-share.git
 $ git --git-dir=. config receive.denyNonFastForward true
-#+end_src
-- ͨ���汾��Ĺ��ӽű�ʵ��, ��ʵ�־�ϸ����Ȩ���ƣ�����
-  - ֻ�Բ����û���������
-  - �����ض��û�ִ�зǿ��ʽ����
-  - ֻ����ĳЩ��֧���Խ���ǿ���ύ
-
+#+END_SRC
+- 通过版本库的钩子脚本实现, 可实现精细的授权控制，比如
+  - 只对部分用户进行限制
+  - 允许特定用户执行非快进式推送
+  - 只允许某些分支可以进行强制提交
+ 

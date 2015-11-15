@@ -128,7 +128,6 @@ capture conversion can apply:
 - capture conversion won't apply if the type parameter is used with more than one method parameter.
 - you can only apply capture conversion if the type variable is defined at the top-level of the generic type.
 
-
 ** Erasure
 Drop all type parameters from parameterized types, and replace any type variable with the erasure of its bound, or with 
 =Object= if it has no bound, or with the erasure of the leftmost bound if it has multiple bounds.

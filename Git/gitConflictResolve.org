@@ -1,19 +1,19 @@
-#+TITLE: Git³åÍ»½â¾ö
+#+TITLE: Gitå†²çªè§£å†³
 
-* ×Ô¶¯ºÏ²¢
-** ĞŞ¸Ä²»Í¬µÄÎÄ¼ş
-²Î¿¼²©ÎÄ[[http://tech-note.github.com/blog/2013/02/28/git-user-cooperation/][gitÓÃ»§Ğ­×÷]]
-** ĞŞ¸ÄÏàÍ¬ÎÄ¼şµÄ²»Í¬²¿·Ö
-ÂÔ
-** Í¬Ê±¸ü¸ÄÎÄ¼şÃû¼°ÆäÄÚÈİ
-Èç¹ûÒ»¸öÓÃ»§½«Ä³ÎÄ¼ş¸ÄÃû»òÒÆ¶¯µ½ÆäËûÄ¿Â¼£¬ÁíÍâÒ»¸öÓÃ»§Õë¶Ô±»ÖØÃüÃûÇ°µÄÎÄ¼ş½øĞĞÁËĞŞ¸Ä£¬git»¹ÊÇÄÜ×Ô¶¯½â¾ö³åÍ»¡¢²¢ÊµÏÖºÏ²¢µÄ¡£
-* ³åÍ»ºÏ²¢
-ÈôÁ½¸öÓÃ»§ĞŞ¸ÄÁËÍ¬Ò»ÎÄ¼şµÄÍ¬Ò»ÇøÓò£¬Ôògit²»ÄÜÍê³É×Ô¶¯ºÏ²¢¡£ÕâÖÖÇé¿öÏÂ£¬git pullÔÚÍê³Égit fetchµÄ²Ù×÷ºó£¬Ò²»áÔÚÖ´ĞĞgit mergeÊ±Ê§°ÜÖĞ¶ÏµÄ¡£ 
-×îºÃµÄ½â¾ö°ì·¨ÊÇÊ¹ÓÃÍ¼ĞÎ¹¤¾ß½â¾ö³åÍ»¡£ÕâÀïÊ¹ÓÃÁËkdiff3¡£ 
-°²×°ÅäÖÃ¹ı³ÌÈçÏÂ£¬
-- ÏÂÔØ[[http://sourceforge.net/projects/kdiff3/][kdiff3]]
-- °²×°£ºÒ»Â·»Ø³µ
-- ÎªgitÖ¸¶¨kdiff3×÷Îªmerge¹¤¾ß£¬ÔÚÈ«¾ÖÅäÖÃÎÄ¼ş£¨git config -e --global£©ÖĞ£¬Ìí¼Ó
+* è‡ªåŠ¨åˆå¹¶
+** ä¿®æ”¹ä¸åŒçš„æ–‡ä»¶
+å‚è€ƒåšæ–‡[[http://tech-note.github.com/blog/2013/02/28/git-user-cooperation/][gitç”¨æˆ·åä½œ]]
+** ä¿®æ”¹ç›¸åŒæ–‡ä»¶çš„ä¸åŒéƒ¨åˆ†
+ç•¥
+** åŒæ—¶æ›´æ”¹æ–‡ä»¶ååŠå…¶å†…å®¹
+å¦‚æœä¸€ä¸ªç”¨æˆ·å°†æŸæ–‡ä»¶æ”¹åæˆ–ç§»åŠ¨åˆ°å…¶ä»–ç›®å½•ï¼Œå¦å¤–ä¸€ä¸ªç”¨æˆ·é’ˆå¯¹è¢«é‡å‘½åå‰çš„æ–‡ä»¶è¿›è¡Œäº†ä¿®æ”¹ï¼Œgitè¿˜æ˜¯èƒ½è‡ªåŠ¨è§£å†³å†²çªã€å¹¶å®ç°åˆå¹¶çš„ã€‚
+* å†²çªåˆå¹¶
+è‹¥ä¸¤ä¸ªç”¨æˆ·ä¿®æ”¹äº†åŒä¸€æ–‡ä»¶çš„åŒä¸€åŒºåŸŸï¼Œåˆ™gitä¸èƒ½å®Œæˆè‡ªåŠ¨åˆå¹¶ã€‚è¿™ç§æƒ…å†µä¸‹ï¼Œgit pullåœ¨å®Œæˆgit fetchçš„æ“ä½œåï¼Œä¹Ÿä¼šåœ¨æ‰§è¡Œgit mergeæ—¶å¤±è´¥ä¸­æ–­çš„ã€‚ 
+æœ€å¥½çš„è§£å†³åŠæ³•æ˜¯ä½¿ç”¨å›¾å½¢å·¥å…·è§£å†³å†²çªã€‚è¿™é‡Œä½¿ç”¨äº†kdiff3ã€‚ 
+å®‰è£…é…ç½®è¿‡ç¨‹å¦‚ä¸‹ï¼Œ
+- ä¸‹è½½[[http://sourceforge.net/projects/kdiff3/][kdiff3]]
+- å®‰è£…ï¼šä¸€è·¯å›è½¦
+- ä¸ºgitæŒ‡å®škdiff3ä½œä¸ºmergeå·¥å…·ï¼Œåœ¨å…¨å±€é…ç½®æ–‡ä»¶ï¼ˆgit config -e --globalï¼‰ä¸­ï¼Œæ·»åŠ 
 #+begin_src sh
 [merge]
         tool = kdiff3
@@ -22,8 +22,8 @@
         keepBackup = false
         trustExitCode = false
 #+end_src
-- Ê¹ÓÃkdiff3½øĞĞmergeµÄÃüÁîÊÇgit mergetool£¬Ö®ºó£¬ĞèÒªÖ´ĞĞgit commitºÍgit push²Ù×÷¡£
-- Ò²¿É½«kdiff3×÷Îª±È½Ï¹¤¾ßÊ¹ÓÃ£¬ĞèÒªÔÚÈ«¾ÖÅäÖÃÎÄ¼şÖĞ£¬Ìí¼Ó
+- ä½¿ç”¨kdiff3è¿›è¡Œmergeçš„å‘½ä»¤æ˜¯git mergetoolï¼Œä¹‹åï¼Œéœ€è¦æ‰§è¡Œgit commitå’Œgit pushæ“ä½œã€‚
+- ä¹Ÿå¯å°†kdiff3ä½œä¸ºæ¯”è¾ƒå·¥å…·ä½¿ç”¨ï¼Œéœ€è¦åœ¨å…¨å±€é…ç½®æ–‡ä»¶ä¸­ï¼Œæ·»åŠ 
 #+begin_src sh
 [diff]
         tool = kdiff3
@@ -32,13 +32,13 @@
         keepBackup = false
         trustExitCode = false
 #+end_src
-- Ê¹ÓÃkdiff3×÷±È½ÏµÄÃüÁî£¬Èçgit difftool -y, git difftool -v HEAD
-* Ê÷ºÏ²¢
-µ±Á½¸öÓÃ»§ÎªÍ¬Ò»¸öÎÄ¼ş¸üÃûÊ±£¬gitÊÇÎŞ·¨¶ÔÕâÁ½¸öÓÃ»§µÄÌá½»½øĞĞºÏ²¢µÄ£¬ÕâÖÖ³åÍ»³ÆÎªÊ÷³åÍ»¡£ 
+- ä½¿ç”¨kdiff3ä½œæ¯”è¾ƒçš„å‘½ä»¤ï¼Œå¦‚git difftool -y, git difftool -v HEAD
+* æ ‘åˆå¹¶
+å½“ä¸¤ä¸ªç”¨æˆ·ä¸ºåŒä¸€ä¸ªæ–‡ä»¶æ›´åæ—¶ï¼Œgitæ˜¯æ— æ³•å¯¹è¿™ä¸¤ä¸ªç”¨æˆ·çš„æäº¤è¿›è¡Œåˆå¹¶çš„ï¼Œè¿™ç§å†²çªç§°ä¸ºæ ‘å†²çªã€‚ 
 
-Ê÷³åÍ»ÊÇ²»ÄÜÊ¹ÓÃÍ¼ĞÎ»¯µÄ¹¤¾ß½â¾öµÄ£¬¿ÉÒÔÍ¨¹ıgit mergetoolÒÔÃüÁîĞĞ½»»¥Ê½µÄ·½·¨½â¾ö¡£ÏÂÃæ½éÉÜ¸öÀı×Ó¡£ 
+æ ‘å†²çªæ˜¯ä¸èƒ½ä½¿ç”¨å›¾å½¢åŒ–çš„å·¥å…·è§£å†³çš„ï¼Œå¯ä»¥é€šè¿‡git mergetoolä»¥å‘½ä»¤è¡Œäº¤äº’å¼çš„æ–¹æ³•è§£å†³ã€‚ä¸‹é¢ä»‹ç»ä¸ªä¾‹å­ã€‚ 
 
-ÏÈ½øĞĞÒ»Ğ©×¼±¸¹¤×÷,³õÊ¼»¯Ò»¸öÂã°æ±¾¿â£¨git-share.git£©£¬¼°Á½¸öÓÃ»§¹¤×÷Ä¿Â¼£¨git-user1,git-user2£©£¬²¢Í¨¹ıgit-user1ÏòÆäÖĞÌí¼ÓÁËÒ»¸öÎÄ¼ş£¨README£©,¹©ÎÒÃÇËæºóÊ¹ÓÃ¡£
+å…ˆè¿›è¡Œä¸€äº›å‡†å¤‡å·¥ä½œ,åˆå§‹åŒ–ä¸€ä¸ªè£¸ç‰ˆæœ¬åº“ï¼ˆgit-share.gitï¼‰ï¼ŒåŠä¸¤ä¸ªç”¨æˆ·å·¥ä½œç›®å½•ï¼ˆgit-user1,git-user2ï¼‰ï¼Œå¹¶é€šè¿‡git-user1å‘å…¶ä¸­æ·»åŠ äº†ä¸€ä¸ªæ–‡ä»¶ï¼ˆREADMEï¼‰,ä¾›æˆ‘ä»¬éšåä½¿ç”¨ã€‚
 #+begin_src git
 $ git init --bare git-share.git
 Initialized empty Git repository in c:/Documents and Settings/lhou/git-share.git/
@@ -71,7 +71,7 @@ Unpacking objects: 100% (3/3), done.
 From c:/Documents and Settings/lhou/./git-share
  * [new branch]      master     -> origin/master
 #+end_src
-ÏÈÓÉgit-user2½øĞĞ¸ÄÃû
+å…ˆç”±git-user2è¿›è¡Œæ”¹å
 #+begin_src git
 $ pwd
 /c/Documents and Settings/lhou/git-user2
@@ -101,7 +101,7 @@ Total 2 (delta 0), reused 0 (delta 0)
 To c:/Documents and Settings/lhou/./git-share.git
    4942175..7bd2b3c  master -> master
 #+end_src
-¸ÄÃû³É¹¦£¬ÏÂÃægit-user1¿ªÊ¼¸ÄÃû
+æ”¹åæˆåŠŸï¼Œä¸‹é¢git-user1å¼€å§‹æ”¹å
 #+begin_src git
 $ cd ../git-user1/
 $ git ls-tree HEAD
@@ -135,7 +135,7 @@ hint: its remote counterpart. Merge the remote changes (e.g. 'git pull')
 hint: before pushing again.
 hint: See the 'Note about fast-forwards' in 'git push --help' for details.
 #+end_src
-¸ÄÃûÊ§°ÜÁË£¡ ÌáÊ¾Ëµ£¬ÕâÀïµÄgit pushÊÇ[[http://tech-note.github.com/blog/2013/02/28/git-user-cooperation/][·Ç¿ì½øÊ½ÍÆËÍ]], Ó¦¸ÃÏÈÖ´ĞĞgit pull¡£ºÃ£¬ÄÇ¾ÍÏÈÖ´ĞĞgit pull¡£
+æ”¹åå¤±è´¥äº†ï¼ æç¤ºè¯´ï¼Œè¿™é‡Œçš„git pushæ˜¯[[http://tech-note.github.com/blog/2013/02/28/git-user-cooperation/][éå¿«è¿›å¼æ¨é€]], åº”è¯¥å…ˆæ‰§è¡Œgit pullã€‚å¥½ï¼Œé‚£å°±å…ˆæ‰§è¡Œgit pullã€‚
 #+begin_src git
 $ git pull
 remote: Counting objects: 3, done.
@@ -146,7 +146,7 @@ From c:/Documents and Settings/lhou/./git-share
 CONFLICT (rename/rename): Rename "README"->"user1" in branch "HEAD" rename "README"->"user2" in "7bd2b3c3ca452085aefe8702e4bfb398711aba79"
 Automatic merge failed; fix conflicts and then commit the result.
 #+end_src
-¿É¼û£¬git pullÒÑÍê³Égit fetchµÄ¹¤×÷£¬µ«ÊÇÖ´ĞĞgit merge¹¤×÷Ê±Ê§°ÜÁË£¡Ö±µ½ÕâÊ±¾Í¿ÉÒÔ¿ªÊ¼Ê¹ÓÃgit mergetool½»»¥Ê½µÄ½â¾öÊ÷³åÍ»ÁË£¡
+å¯è§ï¼Œgit pullå·²å®Œæˆgit fetchçš„å·¥ä½œï¼Œä½†æ˜¯æ‰§è¡Œgit mergeå·¥ä½œæ—¶å¤±è´¥äº†ï¼ç›´åˆ°è¿™æ—¶å°±å¯ä»¥å¼€å§‹ä½¿ç”¨git mergetooläº¤äº’å¼çš„è§£å†³æ ‘å†²çªäº†ï¼
 #+begin_src git
 $ git mergetool
 Merging:
@@ -161,23 +161,23 @@ Deleted merge conflict for 'README':
   {remote}: deleted
 Use (m)odified or (d)eleted file, or (a)bort? d
 #+end_src
-ÕâÀï£¬Ñ¡Ôñd»Ø³µ£¬±íÊ¾É¾³ıÎÄ¼şREADME¡£
+è¿™é‡Œï¼Œé€‰æ‹©då›è½¦ï¼Œè¡¨ç¤ºåˆ é™¤æ–‡ä»¶READMEã€‚
 #+begin_src sh
 Deleted merge conflict for 'user1':
   {local}: created file
   {remote}: deleted
 Use (c)reated or (d)eleted file, or (a)bort? c
 #+end_src
-ÕâÀï£¬Ñ¡Ôñc»Ø³µ£¬±íÊ¾´´½¨ÎÄ¼şuser1£¬ÈÃÎÒÃÇµÄÕâ´Î¸ÄÃû³É¹¦£¬¸²¸ÇÖ®Ç°µÄgit-user2¸ÄÃû¡£
+è¿™é‡Œï¼Œé€‰æ‹©cå›è½¦ï¼Œè¡¨ç¤ºåˆ›å»ºæ–‡ä»¶user1ï¼Œè®©æˆ‘ä»¬çš„è¿™æ¬¡æ”¹åæˆåŠŸï¼Œè¦†ç›–ä¹‹å‰çš„git-user2æ”¹åã€‚
 #+begin_src sh
 Deleted merge conflict for 'user2':
   {local}: deleted
   {remote}: created file
 Use (c)reated or (d)eleted file, or (a)bort? d
 #+end_src
-ÕâÀï£¬Ñ¡Ôñd»Ø³µ£¬±íÊ¾É¾³ıÎÄ¼şuser2¡£ 
+è¿™é‡Œï¼Œé€‰æ‹©då›è½¦ï¼Œè¡¨ç¤ºåˆ é™¤æ–‡ä»¶user2ã€‚ 
 
-Õû¸ö½»»¥¹ı³Ì¿É¼û
+æ•´ä¸ªäº¤äº’è¿‡ç¨‹å¯è§
 #+begin_src git
 $ git mergetool
 Merging:
@@ -202,12 +202,12 @@ Deleted merge conflict for 'user2':
   {remote}: created file
 Use (c)reated or (d)eleted file, or (a)bort? d
 #+end_src
-²é¿´×´Ì¬£¬·¢ÏÖ³ıÁËÉĞÎ´ÇåÀíµÄÁÙÊ±ÎÄ¼ş£¬ÒÑÃ»³åÍ»ÁË£¡
+æŸ¥çœ‹çŠ¶æ€ï¼Œå‘ç°é™¤äº†å°šæœªæ¸…ç†çš„ä¸´æ—¶æ–‡ä»¶ï¼Œå·²æ²¡å†²çªäº†ï¼
 #+begin_src git
 $ git status -s
 ?? user1.orig
 #+end_src
-ÏÂÃæÌá½»£¬²¢ÍÆËÍµ½¹²ÏíµÄÂã°æ±¾¿â¡£
+ä¸‹é¢æäº¤ï¼Œå¹¶æ¨é€åˆ°å…±äº«çš„è£¸ç‰ˆæœ¬åº“ã€‚
 #+begin_src git
 $ git commit -m "fix tree conflict"
 [master c5b59d4] fix tree conflict
