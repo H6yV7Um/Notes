@@ -1,0 +1,1559 @@
+#+TITLE: 链接与装载
+
+* 简介
+结合ELF文件的结构，以实例的形式介绍编译、链接及装载的技术细节。
+
+ELF类型的文件包括：编译产生的目标文件、动态链接库、可执行文件等。静态链接库是对目标文件的一个打包。
+* 编译
+** 目标文件
+#+BEGIN_SRC c :file s1.c
+#include <stdio.h>
+
+int global_init_var = 82;
+int global_uninit_var;
+
+int sbar(){
+  static int static_var = 54;
+  static int static_var2;
+  int sum;
+
+  printf("&static_var: %p, &static_var2(%d): %p\n",
+         (void*)&static_var, static_var2, (void*)&static_var2);
+  sum = static_var + static_var2;
+  return sum;
+}
+
+void sfoo(){
+  int  s = sbar()-54;
+  printf("value returned by sbar(): %d\n", s);
+}
+#+END_SRC
+编译成目标文件 =$gcc -m32 -c s1.c -o s1.o=
+
+*** 文件头
+#+BEGIN_SRC sh
+$ readelf -h s1.o
+ELF 头：
+  Magic：   7f 45 4c 46 01 01 01 00 00 00 00 00 00 00 00 00
+  Class:                             ELF32
+  Data:                              2's complement, little endian
+  Version:                           1 (current)
+  OS/ABI:                            UNIX - System V
+  ABI Version:                       0
+  Type:                              REL (可重定位文件)
+  Machine:                           Intel 80386
+  Version:                           0x1
+  入口点地址：               0x0
+  程序头起点：          0 (bytes into file)
+  Start of section headers:          464 (bytes into file)
+  标志：             0x0
+  本头的大小：       52 (字节)
+  程序头大小：       0 (字节)
+  Number of program headers:         0
+  节头大小：         40 (字节)
+  节头数量：         13
+  字符串表索引节头： 10
+#+END_SRC
+
+本文件头（Size of this header）的大小，这与 /.text/ 在文件中的偏移量一致。
+
+ELF文件的类型（Type）
+| 类型 | 含义         |
+| REL  | 可重定位文件 |
+| EXEC | 可执行文件   |
+| DYN  | 共享文件     |
+| CORE | 核心转储文件 |
+
+入口点地址（Entry Point Address）是程序入口的虚拟地址，可重定位文件一般没有该地址，故值为0。
+
+字符串表索引节点（Section headers string table index）,指出与段名表相应的段表描述符的索引。
+
+段表在文件中的起始地址（Start of section headers）。
+
+节头大小（Size of section headers）,段表描述符的大小。
+
+节头数量（Number of section headers）,段表描述符的数量。
+
+*** 段表
+#+BEGIN_SRC sh
+$ readelf -S s1.o
+共有 13 个节头，从偏移量 0x1d0 开始：
+节头：
+  [Nr] Name              Type            Addr     Off    Size   ES Flg Lk Inf Al
+  [ 0]                   NULL            00000000 000000 000000 00      0   0  0
+  [ 1] .text             PROGBITS        00000000 000034 000066 00  AX  0   0  1
+  [ 2] .rel.text         REL             00000000 000534 000050 08     11   1  4
+  [ 3] .data             PROGBITS        00000000 00009c 000008 00  WA  0   0  4
+  [ 4] .bss              NOBITS          00000000 0000a4 000004 00  WA  0   0  4
+  [ 5] .rodata           PROGBITS        00000000 0000a4 000045 00   A  0   0  4
+  [ 6] .comment          PROGBITS        00000000 0000e9 00002c 01  MS  0   0  1
+  [ 7] .note.GNU-stack   PROGBITS        00000000 000115 000000 00      0   0  1
+  [ 8] .eh_frame         PROGBITS        00000000 000118 000058 00   A  0   0  4
+  [ 9] .rel.eh_frame     REL             00000000 000584 000010 08     11   8  4
+  [10] .shstrtab         STRTAB          00000000 000170 00005f 00      0   0  1
+  [11] .symtab           SYMTAB          00000000 0003d8 000100 10     12  11  4
+  [12] .strtab           STRTAB          00000000 0004d8 00005a 00      0   0  1
+Key to Flags:
+  W (write), A (alloc), X (execute), M (merge), S (strings)
+  I (info), L (link order), G (group), T (TLS), E (exclude), x (unknown)
+  O (extra OS processing required) o (OS specific), p (processor specific)
+#+END_SRC
+
+段描述符包含的信息有，段名、段类型、段虚拟地址、段在文件中的偏移、段大小、段中所含项的长
+度（ES）、段的标志、段的链接信息（Link, Info）及对齐要求。
+
+常见段
+| 段名      | 含义                                                     |
+| .text     | 代码段                                                   |
+| .rel.text | 代码段重定位表                                           |
+| .data     | 数据段                                                   |
+| .rel.data | 数据段重定位表                                           |
+| .bss      | 未初始化的数据段                                         |
+| .rodata1  | 同.rodata一样，存放只读数据，如字符串常量、全局const变量 |
+| .symtab   | 符号表                                                   |
+| .hash     | 符号哈希表                                               |
+| .comment  | 存放编译器版本信息                                       |
+| .shstrtab | 段名表                                                   |
+| .strtab   | 字符串表，存放ELF文件中用到的字符串                      |
+
+某些段包含了一些固定大小的项，比如符号表，对于这样的段，ES用于给出这些项的大小。
+
+段类型
+| 段类型   | 含义                       |
+| PROGBITS | 程序段，包括代码段，数据段 |
+| RELA     | 重定位表，有补齐字段       |
+| REL      | 重定位表，没补齐字段       |
+| NOBITS   | 该段在文件中没内容         |
+| STRTAB   | 字符串表                   |
+| SYMTAB   | 符号表                     |
+| HASH     | 符号表的哈希表             |
+
+
+由于没有进行链接，所以段的虚拟地址都为0。
+
+数据段 .data 中存放的是已初始化了的全局变量 global\under{}init\under{}var
+和已初始化的局部静态变量 static\under{}var ，正好8个字节。
+
+只读数据段 /.rodata/ 中存放的是字符串常量, "&static\under{}var: %p, &static\under{}var2(%d): %p\n"
+和“value returned by sbar(): %d\n”加起来正好69字节。
+
+未初始化数据段 .bss 存放的是未初始化的全局变量和未初始化的局部静态变量，该段在文件中不
+占空间，且在执行时其所占的空间大小是4字节，而非8字节，原因是这里只计算了未初始化的局部静
+态变量 static\under{}var2 的大小，而对于未初始化的全局变量
+global\under{}uninit\under{}var （典型的弱符号），由于可能在其他编译单元定义的大小
+不一样，所以此时无法决断，需要等到链接时再在 .bss 中考虑它，在这里，该变量只是一个未定义
+的“COMMON 符号”。
+
+段的标志 A(Alloc) 表示需要在进程空间中分配内存。
+
+段的链接信息
+| 段类型 | Link                             | Info                               |
+| HASH   | 该段所使用的符号表在段表中的下标 | 0                                  |
+| REL    | 该段所使用的符号表在段表中的下标 | 该重定位表所作用的段在段表中的下标 |
+| RELA   | 同REL                            | 同REL                              |
+| SYMTAB | 操作系统相关                     | 操作系统相关                       |
+
+强符号，就是函数和初始化了的全局变量。弱符号，就是未初始化的全局变量。强符号、弱符号都是针对符号的定义而言的，不针对符号的引用。可通过
+/\under{}\under{}attribute\under{}\under{}((weak))/ 来讲一个强符号变为弱符号。对于强符号、弱符号，链接器的处理规则
+- 不允许强符号的重复定义
+- 在一个目标文件为强符号，在其他目标文件为弱符号，则选择强符号
+- 一个符号在所有目标文件中都是弱符号，则选择占用空间最大的那个
+
+*** 符号表
+符号是变量和函数的统称。每一个目标文件都有一个符号表。符号表中的符号记录着本目标文件中定义
+的(导出符号)和使用的全局符号（导入符号）。从ELF文件头，可知每个符号在符号表在16个字节。
+#+BEGIN_SRC sh
+$ readelf -s s1.o
+Symbol table '.symtab' contains 16 entries:
+   Num:    Value  Size Type    Bind   Vis      Ndx Name
+     0: 00000000     0 NOTYPE  LOCAL  DEFAULT  UND
+     1: 00000000     0 FILE    LOCAL  DEFAULT  ABS s1.c
+     2: 00000000     0 SECTION LOCAL  DEFAULT    1
+     3: 00000000     0 SECTION LOCAL  DEFAULT    3
+     4: 00000000     0 SECTION LOCAL  DEFAULT    4
+     5: 00000000     0 SECTION LOCAL  DEFAULT    5
+     6: 00000000     4 OBJECT  LOCAL  DEFAULT    4 static_var2.1828
+     7: 00000004     4 OBJECT  LOCAL  DEFAULT    3 static_var.1827
+     8: 00000000     0 SECTION LOCAL  DEFAULT    7
+     9: 00000000     0 SECTION LOCAL  DEFAULT    8
+    10: 00000000     0 SECTION LOCAL  DEFAULT    6
+    11: 00000000     4 OBJECT  GLOBAL DEFAULT    3 global_init_var
+    12: 00000004     4 OBJECT  GLOBAL DEFAULT  COM global_uninit_var
+    13: 00000000    64 FUNC    GLOBAL DEFAULT    1 sbar
+    14: 00000000     0 NOTYPE  GLOBAL DEFAULT  UND printf
+    15: 00000040    38 FUNC    GLOBAL DEFAULT    1 sfoo
+#+END_SRC
+
+符号信息包括：符号值Value、符号大小Size、符号类型Type、符号绑定信息Bind、符号所在段Ndx、
+符号名Name。
+
+符号类型
+| 符号类型 | 含义                 |
+| NOTYPE   | 未知类型             |
+| OBJECT   | 数据对象             |
+| FUNC     | 函数及其他可执行代码 |
+| SECTION  | 段                   |
+| FILE     | 文件名               |
+
+符号绑定信息
+| 绑定信息 | 含义     |
+| LOCAL    | 局部符号 |
+| GLOBAL   | 全局符号 |
+| WEAK     | 弱引用   |
+
+对于定义在本目标文件中的符号，符号所在段是这个符号所在段在段表中的下标；
+对于未定义在本目标文件中的符号，或一些特殊符号，见下表。
+| 符号所在段 | 含义                                                      |
+| ABS        | 该符号包含一个绝对的值， 如文件名符号                     |
+| COM        | 该符号是一个“COMMON” 类型的符号，如未初始化的全局符号定义 |
+| UND        | 未在本目标文件中定义                                      |
+
+符号值
+- 该目标文件不是可执行文件
+  - 符号的定义在该目标文件
+    - 该符号不是“COMMON”类型的
+
+      该符号在段（Ndx）中的偏移
+    - 该符号是“COMMON”类型的
+
+      该符号的对齐属性
+- 该目标文件是可执行文件或共享对象（动态链接库）
+
+  该符号的虚拟地址
+
+*** 重定位表
+该重定位表用于链接时重定位。
+#+BEGIN_SRC sh
+$ readelf -r s1.o
+重定位节 '.rel.text' 位于偏移量 0x534 含有 10 个条目：
+ Offset     Info    Type            Sym.Value  Sym. Name
+00000007  00000401 R_386_32          00000000   .bss
+0000000f  00000401 R_386_32          00000000   .bss
+0000001b  00000301 R_386_32          00000000   .data
+00000022  00000501 R_386_32          00000000   .rodata
+00000027  00000e02 R_386_PC32        00000000   printf
+0000002d  00000301 R_386_32          00000000   .data
+00000032  00000401 R_386_32          00000000   .bss
+00000047  00000d02 R_386_PC32        00000000   sbar
+0000005b  00000501 R_386_32          00000000   .rodata
+00000060  00000e02 R_386_PC32        00000000   printf
+
+重定位节 '.rel.eh_frame' 位于偏移量 0x584 含有 2 个条目：
+ Offset     Info    Type            Sym.Value  Sym. Name
+00000020  00000202 R_386_PC32        00000000   .text
+00000040  00000202 R_386_PC32        00000000   .text
+#+END_SRC
+
+该表中的每个条目都包含着：需要修正的地址在ELF文件中的偏移、修正的方式（Type）、需要修正的符号。
+
+比如，在链接的过程中，.bss的虚拟地址确定后，就需要修正ELF文件中偏移为7，0xd，0x35 这三处的指令。
+** 静态链接库
+Linux下，使用 ar 工具来查看静态库中包含了那些目标文件；使用 objdump 或 readelf 可查看静态库的符号表。
+#+BEGIN_SRC sh
+$ar -t /usr/lib32/libc.a
+init-first.o
+libc-start.o
+sysdep.o
+version.o
+...
+$ readelf -s /usr/lib32/libc.a | grep " printf"
+    23: 00000000  1879 FUNC    GLOBAL DEFAULT    1 printf_size
+    24: 00000760    42 FUNC    GLOBAL DEFAULT    1 printf_size_info
+    10: 00000000    36 FUNC    GLOBAL DEFAULT    1 printf
+#+END_SRC
+
+通常，静态库中的一个目标文件只包含一个函数，如 /usr/lib32/printf.o 中只有 printf 函数。原因是，链接器在链接静态库时，
+是以目标文件为单位的，若很多函数位于同一个目标文件，可能使得没用到的函数也一起被连接到输出的结果中。
+** 动态链接库
+假如程序P1和程序P2都用到了某个模块，则在链接输出的可执行文件P1和P2中将各有该模块的
+一个副本，同时运行这两个程序时，该模块在内存中也有两个副本，这就造成了磁盘和内存的浪费。而且，
+当该模块需要更新时，两个程序都需要重新编译、链接、发布。动态链接解决了这两个问题。
+
+动态链接库的基本思想是，不把程序所依赖的库编译进可执行文件，在程序加载时，也只将可执行文件和动态连接器
+加载到进程空间，然后，在程序运行前，动态连接器负责加载所依赖的库，并执行装载时重定位，即把库的指令和数据
+中对绝对地址的引用进行重定位，这可以解决动态链接库中可修改的数据部分的寻址问题，因为各个进程都有可修改数
+据部分的备份，但这却做不到同一份指令在不同的进程间共享，为此，引出了地址无关代码（PIC），它指的是把指令中
+需要重定位的部分分离出来，放在GOT（Global Offset Table）（包括.got及.got.plt）,并把GOT放在数据段。
+显然，动态链接会在程序执行时引入延时，为了缓解该问题，又引入了借助于PLT实现的延迟加载，通过该方法，
+只在对函数符号（不包括数据符号）的引用实际发生时，才去加载该函数符号。
+
+#+BEGIN_SRC c
+// d2.c
+#include <stdio.h>
+
+int d2_global_uninit;
+
+void ext(){
+  printf("&d2_global_uninit: %p\n", (void *)&d2_global_uninit);
+}
+
+// d1.c	      o
+#include <stdio.h>
+
+static int d1_global_static_uninit;
+extern int d2_global_uninit;
+extern void ext();
+
+void bar(){
+  d1_global_static_uninit = 1;
+  d2_global_uninit = 2;
+  printf("&d1_global_static_uninit: %p, &d2_global_uninit: %p\n",
+          (void *)&d1_global_static_uninit, (void *)&d2_global_uninit);
+}
+
+void foo(){
+  ext();
+  bar();
+}
+#+END_SRC
+
+编译，并查看共享库的依赖关系
+#+BEGIN_SRC sh
+$ gcc -m32 -fPIC -shared d2.c -o d2.so
+$ gcc -m32 -fPIC -shared d1.c d2.so -o d1.so
+
+$ file d2.so
+d2.so: ELF 32-bit LSB  shared object, Intel 80386, version 1 (SYSV), dynamically linked, BuildID[sha1]=0c4f9b94d5c3e746f332954beb0bb09198e6c8ff, not stripped
+$ file d1.so
+d1.so: ELF 32-bit LSB  shared object, Intel 80386, version 1 (SYSV), dynamically linked, BuildID[sha1]=9eccbd9b2c09c11943e355f6cf63c7cc77fa5b6d, not stripped
+
+$ ldd d2.so
+        linux-gate.so.1 =>  (0xf77c4000)
+        libc.so.6 => /lib32/libc.so.6 (0xf75fc000)
+        /lib/ld-linux.so.2 (0xf77c5000)
+$ ldd d1.so
+        linux-gate.so.1 =>  (0xf7709000)
+        d2.so => not found
+        libc.so.6 => /lib32/libc.so.6 (0xf7541000)
+        /lib/ld-linux.so.2 (0xf770a000)
+#+END_SRC
+
+参数 fPIC 指使用地址无关代码。参数 shared 指使用装载时重定位产生共享对象。
+*** 动态链接库的文件头
+#+BEGIN_SRC sh
+$ readelf -h d1.so
+ELF 头：
+  Magic：   7f 45 4c 46 01 01 01 00 00 00 00 00 00 00 00 00
+  Class:                             ELF32
+  Data:                              2's complement, little endian
+  Version:                           1 (current)
+  OS/ABI:                            UNIX - System V
+  ABI Version:                       0
+  Type:                              DYN (共享目标文件)
+  Machine:                           Intel 80386
+  Version:                           0x1
+  入口点地址：               0x4a0
+  程序头起点：          52 (bytes into file)
+  Start of section headers:          4416 (bytes into file)
+  标志：             0x0
+  本头的大小：       52 (字节)
+  程序头大小：       32 (字节)
+  Number of program headers:         7
+  节头大小：         40 (字节)
+  节头数量：         28
+  字符串表索引节头： 25
+#+END_SRC
+
+共享模块的文件头还包含了：入口点地址、程序头起点（start of program headers）、
+程序头大小(size of program header)、程序头数量(number of program headers)。
+
+可执行文件的文件头同共享模块的文件头一样包含了这些信息。
+*** 动态链接库的程序头
+该段表用于链接，称为ELF文件的链接视图；程序头用于装载，称为ELF文件的装载视图。
+从下面的示例，也可以看到它们之间的映射关系。
+#+BEGIN_SRC sh
+$ readelf -l d1.so
+Elf 文件类型为 DYN (共享目标文件)
+入口点 0x4a0
+共有 7 个程序头，开始于偏移量 52
+程序头：
+  Type           Offset   VirtAddr   PhysAddr   FileSiz MemSiz  Flg Align
+  LOAD           0x000000 0x00000000 0x00000000 0x00738 0x00738 R E 0x1000
+  LOAD           0x000ef4 0x00001ef4 0x00001ef4 0x00130 0x00138 RW  0x1000
+  DYNAMIC        0x000f00 0x00001f00 0x00001f00 0x000e8 0x000e8 RW  0x4
+  NOTE           0x000114 0x00000114 0x00000114 0x00024 0x00024 R   0x4
+  GNU_EH_FRAME   0x00068c 0x0000068c 0x0000068c 0x00024 0x00024 R   0x4
+  GNU_STACK      0x000000 0x00000000 0x00000000 0x00000 0x00000 RW  0x10
+  GNU_RELRO      0x000ef4 0x00001ef4 0x00001ef4 0x0010c 0x0010c R   0x1
+
+ Section to Segment mapping:
+  段节...
+   00     .note.gnu.build-id .gnu.hash .dynsym .dynstr .gnu.version .gnu.version_r .rel.dyn .rel.plt .init .plt .text .fini .rodata .eh_frame_hdr .eh_frame
+   01     .init_array .fini_array .jcr .dynamic .got .got.plt .data .bss
+   02     .dynamic
+   03     .note.gnu.build-id
+   04     .eh_frame_hdr
+   05
+   06     .init_array .fini_array .jcr .dynamic .got
+#+END_SRC
+
+每个程序头包含的信息有：类型、在ELF文件中的偏移、虚拟地址、物理地址、在ELF文件中所占大小、在内存中所占大小、标志、对齐属性。
+
+从装载的角度，只需关心 LOAD 类型的。编译时不知共享对象的最终装载位置，所以起始地址为0。它们都是页对齐的。
+*** 动态链接信息表
+尽管在编译命令中输入了文件（d2.so），但符号表中显示的 ext 及 d2\under{}global\under{}uninit 都是
+UND， 且值是0，这与静态编译时不同。其实，编译器是记录了这些符号所在的文件的，可以查看动态链接信息表。
+#+BEGIN_SRC sh
+$ readelf -d d1.so
+Dynamic section at offset 0xf00 contains 25 entries:
+  标记        类型                         名称/值
+ 0x00000001 (NEEDED)                     共享库：[d2.so]
+ 0x00000001 (NEEDED)                     共享库：[libc.so.6]
+ 0x0000000c (INIT)                       0x410
+ 0x0000000d (FINI)                       0x640
+ 0x00000019 (INIT_ARRAY)                 0x1ef4
+ 0x0000001b (INIT_ARRAYSZ)               4 (bytes)
+ 0x0000001a (FINI_ARRAY)                 0x1ef8
+ 0x0000001c (FINI_ARRAYSZ)               4 (bytes)
+ 0x6ffffef5 (GNU_HASH)                   0x138
+ 0x00000005 (STRTAB)                     0x278
+ 0x00000006 (SYMTAB)                     0x178
+ 0x0000000a (STRSZ)                      215 (bytes)
+ 0x0000000b (SYMENT)                     16 (bytes)
+ 0x00000003 (PLTGOT)                     0x2000
+ 0x00000002 (PLTRELSZ)                   40 (bytes)
+ 0x00000014 (PLTREL)                     REL
+ 0x00000017 (JMPREL)                     0x3e8
+ 0x00000011 (REL)                        0x3a0
+ 0x00000012 (RELSZ)                      72 (bytes)
+ 0x00000013 (RELENT)                     8 (bytes)
+ 0x6ffffffe (VERNEED)                    0x370
+ 0x6fffffff (VERNEEDNUM)                 1
+ 0x6ffffff0 (VERSYM)                     0x350
+ 0x6ffffffa (RELCOUNT)                   3
+ 0x00000000 (NULL)                       0x0
+#+END_SRC
+
+各种类型的含义
+| 类型     | 含义                  |
+| NEEDED   | 所依赖的共享对象      |
+| RPATH    | 共享对象的搜索路径    |
+| INIT     | 初始化代码地址        |
+| FINI     | 结束代码地址          |
+| SYMTAB   | 动态链接符号表位置    |
+| STRTAB   | 动态链接字符串表位置  |
+| STRSE    | 动态链接字符串表大小  |
+| REL      | .rel.dyn 地址         |
+| RELSZ    | .rel.dyn 大小         |
+| RELENT   | .rel.dyn 中每项的大小 |
+| JMPREL   | .rel.plt 地址         |
+| PLTRELSZ | .rel.plt 大小         |
+| PLTGOT   | .got.plt 地址         |
+
+*** 动态链接库的段表
+#+BEGIN_SRC sh
+$ readelf -S d1.so
+共有 28 个节头，从偏移量 0x1140 开始：
+节头：
+  [Nr] Name              Type            Addr     Off    Size   ES Flg Lk Inf Al
+  [ 0]                   NULL            00000000 000000 000000 00      0   0  0
+  [ 1] .note.gnu.build-i NOTE            00000114 000114 000024 00   A  0   0  4
+  [ 2] .gnu.hash         GNU_HASH        00000138 000138 000040 04   A  3   0  4
+  [ 3] .dynsym           DYNSYM          00000178 000178 000100 10   A  4   1  4
+  [ 4] .dynstr           STRTAB          00000278 000278 0000d7 00   A  0   0  1
+  [ 5] .gnu.version      VERSYM          00000350 000350 000020 02   A  3   0  2
+  [ 6] .gnu.version_r    VERNEED         00000370 000370 000030 00   A  4   1  4
+  [ 7] .rel.dyn          REL             000003a0 0003a0 000048 08   A  3   0  4
+  [ 8] .rel.plt          REL             000003e8 0003e8 000028 08   A  3  10  4
+  [ 9] .init             PROGBITS        00000410 000410 000023 00  AX  0   0  4
+  [10] .plt              PROGBITS        00000440 000440 000060 04  AX  0   0 16
+  [11] .text             PROGBITS        000004a0 0004a0 00019d 00  AX  0   0 16
+  [12] .fini             PROGBITS        00000640 000640 000014 00  AX  0   0  4
+  [13] .rodata           PROGBITS        00000654 000654 000035 00   A  0   0  4
+  [14] .eh_frame_hdr     PROGBITS        0000068c 00068c 000024 00   A  0   0  4
+  [15] .eh_frame         PROGBITS        000006b0 0006b0 000088 00   A  0   0  4
+  [16] .init_array       INIT_ARRAY      00001ef4 000ef4 000004 00  WA  0   0  4
+  [17] .fini_array       FINI_ARRAY      00001ef8 000ef8 000004 00  WA  0   0  4
+  [18] .jcr              PROGBITS        00001efc 000efc 000004 00  WA  0   0  4
+  [19] .dynamic          DYNAMIC         00001f00 000f00 0000e8 08  WA  4   0  4
+  [20] .got              PROGBITS        00001fe8 000fe8 000018 04  WA  0   0  4
+  [21] .got.plt          PROGBITS        00002000 001000 000020 04  WA  0   0  4
+  [22] .data             PROGBITS        00002020 001020 000004 00  WA  0   0  4
+  [23] .bss              NOBITS          00002024 001024 000008 00  WA  0   0  4
+  [24] .comment          PROGBITS        00000000 001024 00002b 01  MS  0   0  1
+  [25] .shstrtab         STRTAB          00000000 00104f 0000f0 00      0   0  1
+  [26] .symtab           SYMTAB          00000000 0015a0 0003c0 10     27  45  4
+  [27] .strtab           STRTAB          00000000 001960 000205 00      0   0  1
+#+END_SRC
+
+段
+| 段名     | 含义                                                               |
+| .init    | 程序初始化                                                         |
+| .fini    | 程序终结时执行的代码段                                             |
+| .dynsym  | 动态符号表                                                         |
+| .dynstr  | 动态字符串表                                                       |
+| .rel.dyn | 动态链接文件的重定位表。修正数据引用，所修正位置位于 .got 及数据段 |
+| .rel.plt | 动态链接文件的重定位表。修正函数引用，所修正位置位于 .got.plt      |
+| .plt     | 用于延迟绑定的表                                                   |
+| .dynamic | 动态链接信息表                                                     |
+| .got     | 全局偏移表的一部分，用于数据的重定位                               |
+| .got.plt | 全局偏移表的另一部分，用于函数的重定位                             |
+
+段类型
+| 段类型   | 含义                       |
+| DNYSYM   | 动态链接的符号表           |
+| DYNAMIC  | 动态链接信息               |
+
+段的链接信息
+| 段类型  | Link                             | Info                               |
+| DYNAMIC | 该段所使用的字符串表在段表的下标 | 0                                  |
+| DNYSYM  | 操作系统相关                     | 操作系统相关                       |
+
+.data 占用了4字节，.bss 占用了8字节，它们都存放的是什么？
+#+BEGIN_SRC sh
+$ objdump -S -j .data d1.so
+d1.so：     文件格式 elf32-i386
+Disassembly of section .data:
+00002020 <__dso_handle>:
+    2020:       20 20 00 00                                           ..
+
+$ objdump -S -j .bss d1.so
+d1.so：     文件格式 elf32-i386
+Disassembly of section .bss:
+00002024 <__bss_start>:
+    2024:       00 00                   add    %al,(%eax)
+        ...
+00002028 <d1_global_static_uninit>:
+    2028:       00 00 00 00                                         ....
+#+END_SRC
+可见，.data 存放了变量 \under{}\under{}dso\under{}handle; .bss 存放了
+\under{}\under{}bss\under{}start 和变量 d1\under{}global\under{}static\under{}uninit
+
+*** 动态链接库的符号表
+#+BEGIN_SRC sh
+$ readelf -s d1.so
+Symbol table '.dynsym' contains 16 entries:
+   Num:    Value  Size Type    Bind   Vis      Ndx Name
+     0: 00000000     0 NOTYPE  LOCAL  DEFAULT  UND
+     1: 00000000     0 NOTYPE  WEAK   DEFAULT  UND _ITM_deregisterTMCloneTab
+     2: 00000000     0 FUNC    GLOBAL DEFAULT  UND printf@GLIBC_2.0 (2)
+     3: 00000000     0 FUNC    WEAK   DEFAULT  UND __cxa_finalize@GLIBC_2.1.3 (3)
+     4: 00000000     0 NOTYPE  WEAK   DEFAULT  UND __gmon_start__
+     5: 00000000     0 FUNC    GLOBAL DEFAULT  UND ext
+     6: 00000000     0 NOTYPE  WEAK   DEFAULT  UND _Jv_RegisterClasses
+     7: 00000000     0 NOTYPE  WEAK   DEFAULT  UND _ITM_registerTMCloneTable
+     8: 00000000     0 OBJECT  GLOBAL DEFAULT  UND d2_global_uninit
+     9: 00002024     0 NOTYPE  GLOBAL DEFAULT   22 _edata
+    10: 000005cb    82 FUNC    GLOBAL DEFAULT   11 bar
+    11: 0000061d    34 FUNC    GLOBAL DEFAULT   11 foo
+    12: 0000202c     0 NOTYPE  GLOBAL DEFAULT   23 _end
+    13: 00002024     0 NOTYPE  GLOBAL DEFAULT   23 __bss_start
+    14: 00000410     0 FUNC    GLOBAL DEFAULT    9 _init
+    15: 00000640     0 FUNC    GLOBAL DEFAULT   12 _fini
+
+Symbol table '.symtab' contains 60 entries:
+   Num:    Value  Size Type    Bind   Vis      Ndx Name
+     0: 00000000     0 NOTYPE  LOCAL  DEFAULT  UND
+     1: 00000114     0 SECTION LOCAL  DEFAULT    1
+     2: 00000138     0 SECTION LOCAL  DEFAULT    2
+     3: 00000178     0 SECTION LOCAL  DEFAULT    3
+     4: 00000278     0 SECTION LOCAL  DEFAULT    4
+     5: 00000350     0 SECTION LOCAL  DEFAULT    5
+     6: 00000370     0 SECTION LOCAL  DEFAULT    6
+     7: 000003a0     0 SECTION LOCAL  DEFAULT    7
+     8: 000003e8     0 SECTION LOCAL  DEFAULT    8
+     9: 00000410     0 SECTION LOCAL  DEFAULT    9
+    10: 00000440     0 SECTION LOCAL  DEFAULT   10
+    11: 000004a0     0 SECTION LOCAL  DEFAULT   11
+    12: 00000640     0 SECTION LOCAL  DEFAULT   12
+    13: 00000654     0 SECTION LOCAL  DEFAULT   13
+    14: 00000690     0 SECTION LOCAL  DEFAULT   14
+    15: 000006b4     0 SECTION LOCAL  DEFAULT   15
+    16: 00001ef4     0 SECTION LOCAL  DEFAULT   16
+    17: 00001ef8     0 SECTION LOCAL  DEFAULT   17
+    18: 00001efc     0 SECTION LOCAL  DEFAULT   18
+    19: 00001f00     0 SECTION LOCAL  DEFAULT   19
+    20: 00001fe8     0 SECTION LOCAL  DEFAULT   20
+    21: 00002000     0 SECTION LOCAL  DEFAULT   21
+    22: 00002020     0 SECTION LOCAL  DEFAULT   22
+    23: 00002024     0 SECTION LOCAL  DEFAULT   23
+    24: 00000000     0 SECTION LOCAL  DEFAULT   24
+    25: 00000000     0 FILE    LOCAL  DEFAULT  ABS crtstuff.c
+    26: 00001efc     0 OBJECT  LOCAL  DEFAULT   18 __JCR_LIST__
+    27: 000004b0     0 FUNC    LOCAL  DEFAULT   11 deregister_tm_clones
+    28: 000004f0     0 FUNC    LOCAL  DEFAULT   11 register_tm_clones
+    29: 00000540     0 FUNC    LOCAL  DEFAULT   11 __do_global_dtors_aux
+    30: 00002024     1 OBJECT  LOCAL  DEFAULT   23 completed.6591
+    31: 00001ef8     0 OBJECT  LOCAL  DEFAULT   17 __do_global_dtors_aux_fin
+    32: 00000590     0 FUNC    LOCAL  DEFAULT   11 frame_dummy
+    33: 00001ef4     0 OBJECT  LOCAL  DEFAULT   16 __frame_dummy_init_array_
+    34: 00000000     0 FILE    LOCAL  DEFAULT  ABS d1.c
+    35: 00002028     4 OBJECT  LOCAL  DEFAULT   23 d1_global_static_uninit
+    36: 00000000     0 FILE    LOCAL  DEFAULT  ABS crtstuff.c
+    37: 00000738     0 OBJECT  LOCAL  DEFAULT   15 __FRAME_END__
+    38: 00001efc     0 OBJECT  LOCAL  DEFAULT   18 __JCR_END__
+    39: 00000000     0 FILE    LOCAL  DEFAULT  ABS
+    40: 000004a0     4 FUNC    LOCAL  DEFAULT   11 __x86.get_pc_thunk.bx
+    41: 00002020     0 OBJECT  LOCAL  DEFAULT   22 __dso_handle
+    42: 00001f00     0 OBJECT  LOCAL  DEFAULT   19 _DYNAMIC
+    43: 00002024     0 OBJECT  LOCAL  DEFAULT   22 __TMC_END__
+    44: 00002000     0 OBJECT  LOCAL  DEFAULT   21 _GLOBAL_OFFSET_TABLE_
+    45: 00000000     0 NOTYPE  WEAK   DEFAULT  UND _ITM_deregisterTMCloneTab
+    46: 00000000     0 FUNC    GLOBAL DEFAULT  UND printf@@GLIBC_2.0
+    47: 00002024     0 NOTYPE  GLOBAL DEFAULT   22 _edata
+    48: 000005cb    82 FUNC    GLOBAL DEFAULT   11 bar
+    49: 00000640     0 FUNC    GLOBAL DEFAULT   12 _fini
+    50: 00000000     0 FUNC    WEAK   DEFAULT  UND __cxa_finalize@@GLIBC_2.1
+    51: 00000000     0 NOTYPE  WEAK   DEFAULT  UND __gmon_start__
+    52: 0000061d    34 FUNC    GLOBAL DEFAULT   11 foo
+    53: 00000000     0 FUNC    GLOBAL DEFAULT  UND ext
+    54: 0000202c     0 NOTYPE  GLOBAL DEFAULT   23 _end
+    55: 00002024     0 NOTYPE  GLOBAL DEFAULT   23 __bss_start
+    56: 00000000     0 NOTYPE  WEAK   DEFAULT  UND _Jv_RegisterClasses
+    57: 00000000     0 NOTYPE  WEAK   DEFAULT  UND _ITM_registerTMCloneTable
+    58: 00000000     0 OBJECT  GLOBAL DEFAULT  UND d2_global_uninit
+    59: 00000410     0 FUNC    GLOBAL DEFAULT    9 _init
+#+END_SRC
+
+输出包含了两个符号表：.dynsym 和 .symtab ，这两个表中的每一项都是用同一个
+ELF文件的数据结构描述的，输出的每个属性的含义参见 [[符号表]] 一节。
+
+.dynsym是与动态链接相关的符号表，其中的符号有
+- 导入的符号：d2.so中的符号
+
+  如 ext, d2\under{}global\under{}uninit
+- 导出的符号： d1.so中定义的的符号
+
+  如 bar, foo, 但不包含文件的局部变量 d1\under{}global\under{}static\under{}uninit，因其作用域仅限于 d1.c
+- 导入的符号： 引用glibc的符号
+
+  如 printf@GLIBC\under{}2.0
+- 导出的符号： 链接器生成的符号
+
+  如 \under{}end, \under{}edata, \under{}bss\under{}start，这些符号可在程序中声明并使用。
+
+.symtab 不仅涵盖 .dynsym 中的全部符号，还包括了24个 section 及 变量
+d1\under{}global\under{}static\under{}uninit （作用域仅限于 d1.c）
+
+*** 动态链接重定位相关信息
+这些信息用于装载时重定位。
+#+BEGIN_SRC sh
+$ readelf -r d1.so
+重定位节 '.rel.dyn' 位于偏移量 0x3a0 含有 9 个条目：
+ Offset     Info    Type            Sym.Value  Sym. Name
+00001ef4  00000008 R_386_RELATIVE
+00001ef8  00000008 R_386_RELATIVE
+00002020  00000008 R_386_RELATIVE
+00001fe8  00000106 R_386_GLOB_DAT    00000000   _ITM_deregisterTMClone
+00001fec  00000306 R_386_GLOB_DAT    00000000   __cxa_finalize
+00001ff0  00000406 R_386_GLOB_DAT    00000000   __gmon_start__
+00001ff4  00000606 R_386_GLOB_DAT    00000000   _Jv_RegisterClasses
+00001ff8  00000706 R_386_GLOB_DAT    00000000   _ITM_registerTMCloneTa
+00001ffc  00000806 R_386_GLOB_DAT    00000000   d2_global_uninit
+
+重定位节 '.rel.plt' 位于偏移量 0x3e8 含有 5 个条目：
+ Offset     Info    Type            Sym.Value  Sym. Name
+0000200c  00000207 R_386_JUMP_SLOT   00000000   printf
+00002010  00000a07 R_386_JUMP_SLOT   000005cb   bar
+00002014  00000307 R_386_JUMP_SLOT   00000000   __cxa_finalize
+00002018  00000407 R_386_JUMP_SLOT   00000000   __gmon_start__
+0000201c  00000507 R_386_JUMP_SLOT   00000000   ext
+
+$ objdump -S -j .plt d1.so
+Disassembly of section .plt:
+
+00000440 <printf@plt-0x10>:
+ 440:   ff b3 04 00 00 00       pushl  0x4(%ebx)
+ 446:   ff a3 08 00 00 00       jmp    *0x8(%ebx)
+ 44c:   00 00                   add    %al,(%eax)
+        ...
+
+00000450 <printf@plt>:
+ 450:   ff a3 0c 00 00 00       jmp    *0xc(%ebx)
+ 456:   68 00 00 00 00          push   $0x0
+ 45b:   e9 e0 ff ff ff          jmp    440 <_init+0x30>
+
+00000460 <bar@plt>:
+ 460:   ff a3 10 00 00 00       jmp    *0x10(%ebx)
+ 466:   68 08 00 00 00          push   $0x8
+ 46b:   e9 d0 ff ff ff          jmp    440 <_init+0x30>
+
+00000470 <__cxa_finalize@plt>:
+ 470:   ff a3 14 00 00 00       jmp    *0x14(%ebx)
+ 476:   68 10 00 00 00          push   $0x10
+ 47b:   e9 c0 ff ff ff          jmp    440 <_init+0x30>
+
+00000480 <__gmon_start__@plt>:
+ 480:   ff a3 18 00 00 00       jmp    *0x18(%ebx)
+ 486:   68 18 00 00 00          push   $0x18
+ 48b:   e9 b0 ff ff ff          jmp    440 <_init+0x30>
+
+00000490 <ext@plt>:
+ 490:   ff a3 1c 00 00 00       jmp    *0x1c(%ebx)
+ 496:   68 20 00 00 00          push   $0x20
+ 49b:   e9 a0 ff ff ff          jmp    440 <_init+0x30>
+
+$ objdump -s d1.so
+...
+Contents of section .got:
+ 1fe8 00000000 00000000 00000000 00000000  ................
+ 1ff8 00000000 00000000                    ........
+Contents of section .got.plt:
+ 2000 001f0000 00000000 00000000 56040000  ............V...
+ 2010 66040000 76040000 86040000 96040000  f...v...........
+...
+#+END_SRC
+
+从 [[动态链接库的程序头]] 一节可知，.rel.dyn, .rel.plt 及 .plt 都位于代码段，而 .got 及 .got.plt 都我位于数据段。
+
+可见，需要重定位的数据有： 定义在d2.c中的d2\under{}global\under{}uninit 。
+需要重定位的函数有：GLIBC的库函数；定义在d2.c中的ext；定义在本文件的bar；但没有定义在本文件的foo，
+原因是，foo 没有被引用。
+
+需要注意的是，尽管 bar 与 foo 定义在同一文件，连接后，它们之间的相对地址是确定的，但还是需要重定位bar，
+原因是，在装载该共享对象时，如果bar已经存在于全局符号表，也即相同的符号已经存在于
+全局符号表，则该共享对象中的bar就会被忽略，而且，调用了bar的指令（如foo）就需要修正，如果直接修正该指令
+就会使得foo的代码不再是地址无关的了，进而，不能在多个进程间共享，所以，编译器将foo对bar的调用，当成是
+对其他模块中符号的调用，这样，当同名函数覆盖的问题发生时，只需要修正 .got.plt 中的相应位置，不再影响
+共享对象的代码段。
+
+上述各个表的关系图
+#+BEGIN_SRC ascii
+	    410	+-----------+            +------------+ 2020	    +------------+ 4a0
+	        |    	  --+----------->| 496	      |<------------+--	       	 | ext@plt <--- ext( )
+	    408	+-----------+            +------------+ 201c        +------------+ 490
+	       	|         --+----------->| 486	      |<------------+--	       	 | __gmon_start@plt
+	    400	+-----------+            +------------+ 2018	    +------------+ 480
+	        |         --+----------->| 476	      |<------------+--        	 | __cxa_finalize@plt
+	    3f8	+-----------+            +------------+ 2014   	    +------------+ 470
+  	        |	  --+----------->| 466	      |<------------+--	    	 | bar@plt <--- bar( )
+  	    3f0	+-----------+            +------------+ 2010   	    +------------+ 460
+               	|         --+----------->| 456	      |<------------+--        	 | printf@plt <--- printf( )
+    	    3e8	+-----------+            +------------+ 200c	    +------------+ 450
+    	       	  .rel.plt               | 0   	      |	       	       	 .plt
+    	                                 +------------+ 2008
+    	          	                 | 0  	      |
+    	       	                         +------------+ 2004
+    	       	                      	 |1f00 .dynsym|
+   	    3e8	+-----------+            +------------+ 2000 (.got.plt)
+    	       	|	  --+----------->|            |
+    	    3e0	+-----------+            +------------+ 1ffc
+    	       	|         --+----------->|            |
+    	    3d8	+-----------+            +------------+ 1ff8
+    	        |         --+----------->|            |
+    	    3d0 +-----------+            +------------+ 1ff4
+    	        |	  --+----------->|            |
+    	    3c8 +-----------+            +------------+ 1ff0
+    	       	|         --+----------->|            |
+    	    3c0	+-----------+            +------------+ 1fec
+    	       	|         --+----------->|            |
+    	    3b8	+-----------+            +------------+ 1fe8
+    	       	| 2020 .data|		    .got
+    	    3b0	+-----------+
+       	       	| 1ef8      |
+    	    3a8	+-----------+
+                | 1ef4      |
+	    3a0	+-----------+
+       	       	  .rel.dyn
+#+END_SRC
+
+可以看到，.got.plt 的前三项值是 0x1f00， 0x0， 0x0。其中，0x1f00是段.dynamic的地址，其余两项，分别是
+本模块的ID、用于解决函数符号绑定的函数(位于 /lib/ld-linux.so )，这两项是动态链接器装载共享模块时负责将
+它们初始化的，这里暂时都为0。
+
+结合本图，下面讲解：
+**** 动态链接库内部的数据访问
+函数 bar 中， 对 d1\under{}global\under{}static\under{}uninit 的赋值。
+#+BEGIN_SRC asm
+000004a0 <__x86.get_pc_thunk.bx>:
+ 4a0:   8b 1c 24                mov    (%esp),%ebx
+ 4a3:   c3                      ret
+
+....
+
+000005cb <bar>:
+ ...
+ 5d2:   e8 c9 fe ff ff          call   4a0 <__x86.get_pc_thunk.bx>
+ 5d7:   81 c3 29 1a 00 00       add    $0x1a29,%ebx
+ 5dd:   c7 83 28 00 00 00 01    movl   $0x1,0x28(%ebx)
+ ...
+#+END_SRC
+
+在 =call 4a0= 时，会将之后的下一条指令的地址（即5d7）压栈，所以，执行 =mov (%esp),%ebx= 后，
+寄存器ebx的值是5d7, 那么， =movl $0x1,0x28(%ebx)= 就是将 1 放入内存单元 0x5d7+0x1a29+0x28 = 0x2028。
+查询符号表，得知 d1\under{}global\under{}static\under{}uninit 的地址正好是 0x2028。这表明共享模块内部
+的数据访问是不需要重定位的。
+**** 动态链接库间的数据访问
+函数 bar 中， 对 d2\under{}global\under{}uninit 的赋值。
+#+BEGIN_SRC asm
+000005cb <bar>:
+ ...
+ 5d2:   e8 c9 fe ff ff          call   4a0 <__x86.get_pc_thunk.bx>
+ 5d7:   81 c3 29 1a 00 00       add    $0x1a29,%ebx
+ 5dd:   c7 83 28 00 00 00 01    movl   $0x1,0x28(%ebx)
+ 5e4:   00 00 00
+ 5e7:   8b 83 fc ff ff ff       mov    -0x4(%ebx),%eax
+ 5ed:   c7 00 02 00 00 00       movl   $0x2,(%eax)
+#+END_SRC
+
+在上一节，得知寄存器ebx中的值是0x2000，执行 =mov -0x4(%ebx),%eax= 的效果是，将内存0x2000-0x4=0x1ffc
+中的值存入寄存器eax， 执行 =movl $0x2,(%eax)= 的效果是，将2存入eax指向的内存单元，这说明变量
+d2\under{}global\under{}uninit 的地址是存放在0x1ffc中的，查看段表，可知0x1ffc于.got。
+
+再查看重定位表.rel.dyn，可知，装载重定位过程中，待 d2\under{}global\under{}uninit 的地址确定后，
+需要修正0x1ffc处。
+**** 动态链接库内部的函数调用
+函数foo中对函数bar的调用。
+#+BEGIN_SRC asm
+00000460 <bar@plt>:
+ 460:   ff a3 10 00 00 00       jmp    *0x10(%ebx)
+ 466:   68 08 00 00 00          push   $0x8
+ 46b:   e9 d0 ff ff ff          jmp    440 <_init+0x30>
+
+...
+
+0000061b <foo>:
+ ...
+ 622:   e8 79 fe ff ff          call   4a0 <__x86.get_pc_thunk.bx>
+ 627:   81 c3 d9 19 00 00       add    $0x19d9,%ebx
+ 62d:   e8 5e fe ff ff          call   490 <ext@plt>
+ 632:   e8 29 fe ff ff          call   460 <bar@plt>
+#+END_SRC
+
+=call 460= 是调用函数bar，这时，寄存器ebx的值是0x19d9+0x627=0x2000， =jmp *0x10(%ebx)=
+程序将跳转到0x466，原因是内存0x2000+0x10=0x2010中存放的值是0x466，
+即跳转指令的下一条指令的地址，这是编译器放入的。
+
+接着，将立即数8压栈。延迟加载时，动态链接器找到 bar 符号后，取出存在内存 0x3e8+8=0x3f0 （0x3e8 是 .rel.plt 的地址）
+中的值（该值是 0x2010，由编译器存入的，是位于 .got.plt 中的一个单元），然后，去修正地址 0x2010 这个内存单元，使得它
+指向 bar 函数的实际地址。
+
+当再一次调用bar函数时，由于.got.plt的0x2010处存放的是修正过的真实的bar地址，0x460处的代码
+将直接跳转到bar函数执行，从bar函数返回时，弹出栈的PC寄存器的值是调用bar函数地址处的下一个
+指令地址的值，也即0x466将不再执行。
+**** 动态链接库间的函数调用
+函数foo中对函数ext的调用，同共享模块内部的函数调用一样。
+**** 动态链接库内的全局变量
+文件d2.c中对变量 d2\under{}global\under{}uninit 的使用。
+#+BEGIN_SRC asm
+0000056b <ext>:
+ ...
+ 572:   e8 c9 fe ff ff          call   440 <__x86.get_pc_thunk.bx>
+ 577:   81 c3 89 1a 00 00       add    $0x1a89,%ebx
+ 57d:   8b 83 fc ff ff ff       mov    -0x4(%ebx),%eax
+ 583:   89 44 24 04             mov    %eax,0x4(%esp)
+ 587:   8d 83 b0 e5 ff ff       lea    -0x1a50(%ebx),%eax
+ 58d:   89 04 24                mov    %eax,(%esp)
+ 590:   e8 7b fe ff ff          call   410 <printf@plt>
+#+END_SRC
+
+在 =call 440= 的结果是将0x577放入寄存器ebx， =mov %eax,0x4(%esp)= 结果是将0x1ffc中存放的值放入栈中，
+可见，变量 d2\under{}global\under{}uninit 的地址是位于在0x1ffc中的，而0x1ffc是位于.got的，所以，
+对共享模块内全局变量的访问，也是需要重定位的。
+
+原因是，全局变量可能会在主程序中使用，但主程序并不是地址无关的代码（PIC），主程序中可能存在
+=mov $0x1, addrOfGlobalVar= ，这样，为确定该全局变量的地址，链接器就需要在可执行文件中预留一个
+位置（一般是.bss中）给该全局变量，这就要求共享模块也可以访问到主程序中该全局变量的副本，所以，共享模块对
+全局变量的访问必须是可重定位的。
+
+* 链接
+将多个目标文件、库（静态库、动态库）、命令参数、链接控制文件作为输入，产生一个可执行文件的过程，称链接。
+它会合并各个目标文件中类型相同的段、并执行链接时重定位。
+#+BEGIN_SRC c :file m.c
+#include <stdio.h>
+
+extern int global_uninit_var;
+extern int global_init_var;
+extern int d2_global_uninit;
+
+int main(){
+  printf("&global_init_var: %p, &global_uninit_var(%d): %p\n",
+         (void*)&global_init_var, global_uninit_var, (void*)&global_uninit_var);
+
+  sfoo();
+  printf("&d2_global_uninit: %p\n", (void *)&d2_global_uninit);
+  foo();
+  fflush(stdout);
+  sleep(-1);
+
+  return 0;
+}
+#+END_SRC
+编译命令 =gcc -m32 -g m.c s1.c d1.so d2.so -o main -Xlinker -rpath ./= ，
+参数Xlinker及rpath表示链接器在当前路径搜寻共享对象。
+
+具体而言，分两步
+- 空间与地址分配
+  - 将输入目标文件中所有的符号定义及符号引用收集起来，放到全局符号表
+  - 合并所有输入目标文件中的相似段，计算各段合并后的长度及位置，并建立到虚拟地址空间的映射关系
+
+    Linux下， ELF可执行文件默认从0x08048000开始分配虚拟地址空间，ELF文件头及程序头将映射到该
+    虚拟地址0x8048000。
+- 符号解析
+
+  链接器计算出所有目标文件中符号的地址，更新到全局符号表（.symtab），对于在目标文件中没能找到
+  的符号，若在动态链接库中可以找到，同样添加到全局符号表（.symtab），同时，也需要添加到动态链
+  接符号表（.dynsym），若在动态链接库中也找不到，则链接报错。
+
+  C++源码编译后的目标文件中所使用的符号名是相应的函数名（变量名）经过修饰后的名称。对于函数而言，
+  它包含了函数名、参数类型、所在类、名称空间等信息。可以使用命令 /c++filt/ 来解析被修饰过的名称，
+  如 /c++filt \under{}\under{}ZN1N1C4funcEi/ 。这里引出了一个问题，如果C++源文件中使用了C代
+  码的符号（比如 memset），那么链接时链接器将无法找到C代码中的这个符号，原因是C++目标文件中使用
+  的是经过修饰后的符号名（如 \under{}\under{}Z6memsetPvii），不同于C目标文件中的符号名
+ （如 memset）。解决办法是使用 extern "C" （C代码不支持该关键字），对于供C和C++一起使用的头文
+  件，最好这样声明
+  #+BEGIN_SRC c
+  #ifdef __cplusplus
+  extern "C" {
+  #endif
+  void *memset(void*, int, size);
+  #ifdef __cplusplus
+  }
+  #endif
+  #+END_SRC
+
+  强引用，链接时不能找到符号的定义则报错。弱引用，链接时不能找到符号的定义，不报错。
+  使用 /\under{}\under{}attribute\under{}\under{}((weakref))/ 来声明对
+  一个外部函数的引用为弱引用。弱引用的例子
+  #+BEGIN_SRC c
+  __attribute__((weakref)) void foo();
+
+  int main(){
+    if(foo) // check if defination of foo is found.
+      foo();
+  }
+  #+END_SRC
+- 链接时重定位
+
+  空间与地址分配之后，就需要更新程序中一些指令参数的地址，需要更新的位置参见 [[重定位表]]，可与下
+  面程序的对比结果结合起来理解。
+  #+BEGIN_SRC asm
+  // s1.o
+  00000000 <sbar>:
+   0:   55                      push   %ebp
+   1:   89 e5                   mov    %esp,%ebp
+   3:   83 ec 28                sub    $0x28,%esp
+   6:   a1 00 00 00 00          mov    0x0,%eax
+   b:   c7 44 24 0c 00 00 00    movl   $0x0,0xc(%esp)
+  12:   00
+  13:   89 44 24 08             mov    %eax,0x8(%esp)
+  17:   c7 44 24 04 04 00 00    movl   $0x4,0x4(%esp)
+  1e:   00
+  1f:   c7 04 24 00 00 00 00    movl   $0x0,(%esp)
+  26:   e8 fc ff ff ff          call   27 <sbar+0x27>
+  2b:   8b 15 04 00 00 00       mov    0x4,%edx
+  31:   a1 00 00 00 00          mov    0x0,%eax
+  36:   01 d0                   add    %edx,%eax
+  38:   89 45 f4                mov    %eax,-0xc(%ebp)
+  3b:   8b 45 f4                mov    -0xc(%ebp),%eax
+  3e:   c9                      leave
+  3f:   c3                      ret
+  // main
+  08048699 <sbar>:
+  8048699:       55                      push   %ebp
+  804869a:       89 e5                   mov    %esp,%ebp
+  804869c:       83 ec 28                sub    $0x28,%esp
+  804869f:       a1 4c a0 04 08          mov    0x804a04c,%eax
+  80486a4:       c7 44 24 0c 4c a0 04    movl   $0x804a04c,0xc(%esp)
+  80486ab:       08
+  80486ac:       89 44 24 08             mov    %eax,0x8(%esp)
+  80486b0:       c7 44 24 04 30 a0 04    movl   $0x804a030,0x4(%esp)
+  80486b7:       08
+  80486b8:       c7 04 24 d8 87 04 08    movl   $0x80487d8,(%esp)
+  80486bf:       e8 0c fe ff ff          call   80484d0 <printf@plt>
+  80486c4:       8b 15 30 a0 04 08       mov    0x804a030,%edx
+  80486ca:       a1 4c a0 04 08          mov    0x804a04c,%eax
+  80486cf:       01 d0                   add    %edx,%eax
+  80486d1:       89 45 f4                mov    %eax,-0xc(%ebp)
+  80486d4:       8b 45 f4                mov    -0xc(%ebp),%eax
+  80486d7:       c9                      leave
+  80486d8:       c3                      ret
+  #+END_SRC
+
+*** 可执行文件的文件头
+与 [[动态链接库的文件头]] 的主要区别是，可执行文件的文件头中的 TYPE 是 EXEC（可执行文件）；可执行文件
+中的入口点地址是 x8048530。
+*** 可执行文件的程序头
+#+BEGIN_SRC sh
+$ readelf -l main
+Elf 文件类型为 EXEC (可执行文件)
+入口点 0x8048530
+共有 9 个程序头，开始于偏移量 52
+程序头：
+  Type           Offset   VirtAddr   PhysAddr   FileSiz MemSiz  Flg Align
+  PHDR           0x000034 0x08048034 0x08048034 0x00120 0x00120 R E 0x4
+  INTERP         0x000154 0x08048154 0x08048154 0x00013 0x00013 R   0x1
+      [Requesting program interpreter: /lib/ld-linux.so.2]
+  LOAD           0x000000 0x08048000 0x08048000 0x0094c 0x0094c R E 0x1000
+  LOAD           0x000ef0 0x08049ef0 0x08049ef0 0x00144 0x00164 RW  0x1000
+  DYNAMIC        0x000efc 0x08049efc 0x08049efc 0x00100 0x00100 RW  0x4
+  NOTE           0x000168 0x08048168 0x08048168 0x00044 0x00044 R   0x4
+  GNU_EH_FRAME   0x000820 0x08048820 0x08048820 0x0003c 0x0003c R   0x4
+  GNU_STACK      0x000000 0x00000000 0x00000000 0x00000 0x00000 RW  0x10
+  GNU_RELRO      0x000ef0 0x08049ef0 0x08049ef0 0x00110 0x00110 R   0x1
+
+ Section to Segment mapping:
+  段节...
+   00
+   01     .interp
+   02     .interp .note.ABI-tag .note.gnu.build-id .gnu.hash .dynsym .dynstr .gnu.version
+          .gnu.version_r .rel.dyn .rel.plt .init .plt .text .fini .rodata .eh_frame_hdr .eh_frame
+   03     .init_array .fini_array .jcr .dynamic .got .got.plt .data .bss
+   04     .dynamic
+   05     .note.ABI-tag .note.gnu.build-id
+   06     .eh_frame_hdr
+   07
+   08     .init_array .fini_array .jcr .dynamic .got
+#+END_SRC
+
+类型为 PHDR 的程序头用于指出程序头的位置及大小。程序头正好是位于ELF文件头之后，ELF文件头同样将映射到内存中，
+且查看ELF文件头可知，文件头的大小是0x34字节，这也是程序头在ELF文件的偏移，程序头共有9项，每项32字节，正好是
+0x120字节。
+
+类型为 INTERP 的程序头指出了所使用的动态连接器的路径，所占大小正好是路径字符串的大小。
+
+类型为 DYNAMIC 的程序头指出了动态链接信息 .dynamic 段的虚拟地址及大小。
+
+两个类型为 LOAD 类型的程序头分别对应着程序运行的代码段和程序运行的数据段。
+
+加载时，所分配的虚拟地址空间和物理内存都要求是页对齐的，但是，实际中每个LOAD的segment大小并不一定正好是页对齐的，
+如果将每个segment独立开来分配物理内存，就会造成物理内存的浪费，为解决此问题，可以让前一个segment的后面部分和
+后一个segment的前一部分共享一个物理页面，但在到虚拟地址空间的映射时，分别根据segment的属性，采取不同的映射方式，
+对于只读的segment，采取只读的方式映射该共享物理页面到虚拟地址；对于可写的segment，采取COW的方式映射该共享物理页
+到虚拟地址。比如，这里第二个LOAD类型的segment就与第一个LOAD类型的segment共享了一个物理页，该共享物理页偏移量0xef0
+到页结尾的部分被映射到了0x8049ef0开始的虚拟地址，且虚拟地址0x8049000的页框属性应该是COW的。
+*** 可执行文件的段表
+#+BEGIN_SRC sh
+$ readelf -S main
+共有 30 个节头，从偏移量 0x118c 开始：
+节头：
+  [Nr] Name              Type            Addr     Off    Size   ES Flg Lk Inf Al
+  [ 0]                   NULL            00000000 000000 000000 00      0   0  0
+  [ 1] .interp           PROGBITS        08048154 000154 000013 00   A  0   0  1
+  [ 2] .note.ABI-tag     NOTE            08048168 000168 000020 00   A  0   0  4
+  [ 3] .note.gnu.build-i NOTE            08048188 000188 000024 00   A  0   0  4
+  [ 4] .gnu.hash         GNU_HASH        080481ac 0001ac 000044 04   A  5   0  4
+  [ 5] .dynsym           DYNSYM          080481f0 0001f0 000120 10   A  6   1  4
+  [ 6] .dynstr           STRTAB          08048310 000310 0000f2 00   A  0   0  1
+  [ 7] .gnu.version      VERSYM          08048402 000402 000024 02   A  5   0  2
+  [ 8] .gnu.version_r    VERNEED         08048428 000428 000020 00   A  6   1  4
+  [ 9] .rel.dyn          REL             08048448 000448 000018 08   A  5   0  4
+  [10] .rel.plt          REL             08048460 000460 000030 08   A  5  12  4
+  [11] .init             PROGBITS        08048490 000490 000023 00  AX  0   0  4
+  [12] .plt              PROGBITS        080484c0 0004c0 000070 04  AX  0   0 16
+  [13] .text             PROGBITS        08048530 000530 000242 00  AX  0   0 16
+  [14] .fini             PROGBITS        08048774 000774 000014 00  AX  0   0  4
+  [15] .rodata           PROGBITS        08048788 000788 000095 00   A  0   0  4
+  [16] .eh_frame_hdr     PROGBITS        08048820 000820 00003c 00   A  0   0  4
+  [17] .eh_frame         PROGBITS        0804885c 00085c 0000f0 00   A  0   0  4
+  [18] .init_array       INIT_ARRAY      08049ef0 000ef0 000004 00  WA  0   0  4
+  [19] .fini_array       FINI_ARRAY      08049ef4 000ef4 000004 00  WA  0   0  4
+  [20] .jcr              PROGBITS        08049ef8 000ef8 000004 00  WA  0   0  4
+  [21] .dynamic          DYNAMIC         08049efc 000efc 000100 08  WA  6   0  4
+  [22] .got              PROGBITS        08049ffc 000ffc 000004 04  WA  0   0  4
+  [23] .got.plt          PROGBITS        0804a000 001000 000024 04  WA  0   0  4
+  [24] .data             PROGBITS        0804a024 001024 000010 00  WA  0   0  4
+  [25] .bss              NOBITS          0804a040 001034 000014 00  WA  0   0 32
+  [26] .comment          PROGBITS        00000000 001034 00004f 01  MS  0   0  1
+  [27] .shstrtab         STRTAB          00000000 001083 000106 00      0   0  1
+  [28] .symtab           SYMTAB          00000000 00163c 0004f0 10     29  48  4
+  [29] .strtab           STRTAB          00000000 001b2c 0002ea 00      0   0  1
+#+END_SRC
+
+这里不再有 .rel.text 及 .rel.data，因为已经在链接时重定位中将它们解决掉了。
+
+段 .interp 包含着动态连接器的路径，Linux操作系统在加载可执行文件时，会去加载该动态连接器，
+然后使用该动态连接器加载其它共享对象。
+#+BEGIN_SRC sh
+$ objdump -s main
+main：     文件格式 elf32-i386
+Contents of section .interp:
+ 8048154 2f6c6962 2f6c642d 6c696e75 782e736f  /lib/ld-linux.so
+ 8048164 2e3200                               .2.
+#+END_SRC
+
+.bss 本应该是从0x804a034起始，但由于其要求32字节对齐，故起始地址是0x804a040, 该起始地址映射了ELF文件
+的偏移是0x1034,而下面的 [[可执行文件的符号表]] 一节，显示的 \under{}bss\under{}start 的虚拟地址是0x804a034，
+且指出它属于段25（即bss段）。
+
+位于目标文件的 .comment 段的未初始化的全局变量 global\under{}uninit\under{}var 回到了
+.bss 段。.bss 中，也包含了来自动态链接库中的全局变量 d2\under{}global\under{}uninit ，
+原因参见 [[动态链接库内的全局变量]]
+
+#+BEGIN_SRC sh
+$ objdump -dj .bss main
+main：     文件格式 elf32-i386
+Disassembly of section .bss:
+0804a040 <stdout@@GLIBC_2.0>:
+ 804a040:       00 00 00 00                                         ....
+0804a044 <d2_global_uninit>:
+ 804a044:       00 00 00 00                                         ....
+0804a048 <completed.6591>:
+ 804a048:       00 00 00 00                                         ....
+0804a04c <static_var2.1828>:
+ 804a04c:       00 00 00 00                                         ....
+0804a050 <global_uninit_var>:
+ 804a050:       00 00 00 00                                         ....
+#+END_SRC
+
+.data 中，除了目标文件中的已初始化的全局变量及已初始化的局部静态变量外，还包含了 \under{}dso\under{}handle，
+但该变量不是 [[动态链接库的段表]] 一节中提到的同名变量，因为它们各自位于各自的数据段，且不在动态重定位表中。
+#+BEGIN_SRC sh
+$ objdump -dj .data main
+main：     文件格式 elf32-i386
+Disassembly of section .data:
+0804a024 <__data_start>:
+ 804a024:       00 00                   add    %al,(%eax)
+        ...
+0804a028 <__dso_handle>:
+ 804a028:       00 00 00 00                                         ....
+0804a02c <global_init_var>:
+ 804a02c:       52 00 00 00                                         R...
+0804a030 <static_var.1827>:
+ 804a030:       36 00 00 00                                         6...
+#+END_SRC
+*** 可执行文件的符号表
+#+BEGIN_SRC sh
+$ readelf -s main
+Symbol table '.dynsym' contains 18 entries:
+   Num:    Value  Size Type    Bind   Vis      Ndx Name
+     0: 00000000     0 NOTYPE  LOCAL  DEFAULT  UND
+     1: 00000000     0 NOTYPE  WEAK   DEFAULT  UND _ITM_deregisterTMCloneTab
+     2: 00000000     0 FUNC    GLOBAL DEFAULT  UND printf@GLIBC_2.0 (2)
+     3: 00000000     0 FUNC    GLOBAL DEFAULT  UND fflush@GLIBC_2.0 (2)
+     4: 00000000     0 FUNC    GLOBAL DEFAULT  UND sleep@GLIBC_2.0 (2)
+     5: 00000000     0 NOTYPE  WEAK   DEFAULT  UND __gmon_start__
+     6: 00000000     0 FUNC    GLOBAL DEFAULT  UND __libc_start_main@GLIBC_2.0 (2)
+     7: 00000000     0 FUNC    GLOBAL DEFAULT  UND foo
+     8: 00000000     0 NOTYPE  WEAK   DEFAULT  UND _Jv_RegisterClasses
+     9: 00000000     0 NOTYPE  WEAK   DEFAULT  UND _ITM_registerTMCloneTable
+    10: 0804a034     0 NOTYPE  GLOBAL DEFAULT   24 _edata
+    11: 0804a054     0 NOTYPE  GLOBAL DEFAULT   25 _end
+    12: 0804a040     4 OBJECT  GLOBAL DEFAULT   25 stdout@GLIBC_2.0 (2)
+    13: 0804878c     4 OBJECT  GLOBAL DEFAULT   15 _IO_stdin_used
+    14: 0804a034     0 NOTYPE  GLOBAL DEFAULT   25 __bss_start
+    15: 0804a044     4 OBJECT  GLOBAL DEFAULT   25 d2_global_uninit
+    16: 08048490     0 FUNC    GLOBAL DEFAULT   11 _init
+    17: 08048774     0 FUNC    GLOBAL DEFAULT   14 _fini
+
+Symbol table '.symtab' contains 79 entries:
+   Num:    Value  Size Type    Bind   Vis      Ndx Name
+     0: 00000000     0 NOTYPE  LOCAL  DEFAULT  UND
+     ...
+#+END_SRC
+
+这里省略了 .symtab 。 目标文件中定义的各个符号在 .symtab 中的 Value
+属性也不再是某个段的段内偏移了，而是实际运行时的虚拟地址。
+
+foo 作为动态链接符号表中的导入符号（其Value值为0）是可以理解的，因为它是在m.c中引用的
+动态链接库中的符号，而奇怪的是 d2\under{}global\under{}uninit 明明是在m.c中引用的
+动态链接库中的符号，怎么成了main的导出符号呢？原因回见 [[动态链接库内的全局变量]] 。
+
+此处.dynsym中的 \under{}bss\under{}start 应该与 [[动态链接库的符号表]] 的.dynsym 中的同名
+符号，没有关系，因为它们都是导出符号。
+
+.symtab 中UND符号与 .dynsym 中UND符号一致，这些UND的符号都是要在装载时重定位解决掉的。
+
+*** 可执行文件的动态链接信息表
+与 [[ 动态链接信息表]] 类似。
+
+*** 可执行文件的重定位表
+#+BEGIN_SRC sh
+$ readelf -r main
+重定位节 '.rel.dyn' 位于偏移量 0x448 含有 3 个条目：
+ Offset     Info    Type            Sym.Value  Sym. Name
+08049ffc  00000506 R_386_GLOB_DAT    00000000   __gmon_start__
+0804a040  00000c05 R_386_COPY        0804a040   stdout
+0804a044  00000f05 R_386_COPY        0804a044   d2_global_uninit
+
+重定位节 '.rel.plt' 位于偏移量 0x460 含有 6 个条目：
+ Offset     Info    Type            Sym.Value  Sym. Name
+0804a00c  00000207 R_386_JUMP_SLOT   00000000   printf
+0804a010  00000307 R_386_JUMP_SLOT   00000000   fflush
+0804a014  00000407 R_386_JUMP_SLOT   00000000   sleep
+0804a018  00000507 R_386_JUMP_SLOT   00000000   __gmon_start__
+0804a01c  00000607 R_386_JUMP_SLOT   00000000   __libc_start_main
+0804a020  00000707 R_386_JUMP_SLOT   00000000   foo
+
+$ objdump -dj .plt main
+Disassembly of section .plt:
+
+080484c0 <printf@plt-0x10>:
+ 80484c0:       ff 35 04 a0 04 08       pushl  0x804a004
+ 80484c6:       ff 25 08 a0 04 08       jmp    *0x804a008	  o
+ 80484cc:       00 00                   add    %al,(%eax)
+        ...
+
+080484d0 <printf@plt>:
+ 80484d0:       ff 25 0c a0 04 08       jmp    *0x804a00c
+ 80484d6:       68 00 00 00 00          push   $0x0
+ 80484db:       e9 e0 ff ff ff          jmp    80484c0 <_init+0x30>
+
+080484e0 <fflush@plt>:
+ 80484e0:       ff 25 10 a0 04 08       jmp    *0x804a010
+ 80484e6:       68 08 00 00 00          push   $0x8
+ 80484eb:       e9 d0 ff ff ff          jmp    80484c0 <_init+0x30>
+
+080484f0 <sleep@plt>:
+ 80484f0:       ff 25 14 a0 04 08       jmp    *0x804a014
+ 80484f6:       68 10 00 00 00          push   $0x10
+ 80484fb:       e9 c0 ff ff ff          jmp    80484c0 <_init+0x30>
+
+08048500 <__gmon_start__@plt>:
+ 8048500:       ff 25 18 a0 04 08       jmp    *0x804a018
+ 8048506:       68 18 00 00 00          push   $0x18
+ 804850b:       e9 b0 ff ff ff          jmp    80484c0 <_init+0x30>
+
+08048510 <__libc_start_main@plt>:
+ 8048510:       ff 25 1c a0 04 08       jmp    *0x804a01c
+ 8048516:       68 20 00 00 00          push   $0x20
+ 804851b:       e9 a0 ff ff ff          jmp    80484c0 <_init+0x30>
+
+08048520 <foo@plt>:
+ 8048520:       ff 25 20 a0 04 08       jmp    *0x804a020
+ 8048526:       68 28 00 00 00          push   $0x28
+ 804852b:       e9 90 ff ff ff          jmp    80484c0 <_init+0x30>
+
+$ objdump -s main
+Contents of section .got:
+ 8049ffc 00000000                             ....
+Contents of section .got.plt:
+ 804a000 fc9e0408 00000000 00000000 d6840408  ................
+ 804a010 e6840408 f6840408 06850408 16850408  ................
+ 804a020 26850408                             &...
+#+END_SRC
+
+上述各表的关系示意图
+#+BEGIN_SRC ascii
+	    490	+-----------+            +------------+ 804a024	    +------------+ 8048530
+	        |    	  --+----------->| 8048526    |<------------+--	       	 | foo@plt <--- foo( )
+	    488	+-----------+            +------------+ 804a020     +------------+ 8048520
+	       	|         --+----------->| 8048516    |<------------+--	       	 | __libc_start_main@plt
+	    480	+-----------+            +------------+ 804a01c	    +------------+ 8048510
+	        |         --+----------->| 8048506    |<------------+--        	 | __gmon_start__@plt
+	    478	+-----------+            +------------+ 804a018	    +------------+ 8048500
+  	        |	  --+----------->| 80484f6    |<------------+--	    	 | sleep@plt
+  	    470	+-----------+            +------------+ 804a014	    +------------+ 80484f0
+               	|         --+----------->| 80484e6    |<------------+--        	 | fflush@plt
+    	    468	+-----------+            +------------+ 804a010	    +------------+ 80484e0
+    	        |         --+----------->| 80484d6    |<------------+--		 | printf@plt
+  (.rel.plt)460 +-----------+            +------------+	804a00c	    +------------+ 80484d0
+d2_global_uninit| 804a044   |            | 0  	      |	       	       	.plt
+    	    458	+-----------+            +------------+	804a008
+       	 stdout	| 804a040   |            | 0          |
+   	    450	+-----------+            +------------+	804a004
+       	       	|      	  --+---         | 8049efc    |	.dynamic
+  (.rel.dyn)448	+-----------+   \----    +------------+ 804a000(.got.plt)
+    	          .rel.dyn           \-->|            |	__gmon_start__
+       	                                 +------------+	8049ffc
+		                   	    .got
+#+END_SRC
+
+该图的解释可参考 [[动态链接重定位相关信息][动态链接重定位相关信息]] 。
+
+这里，将位于 .bss 段的、虚拟地址已经确定的、定义在 d2.so 中的变量 d2\under{}global\under{}uninit 也放在了
+重定位表中，且在 .got 没有相应的表项，是为何？
+
+* 装载
+在GDB中，将 main 运行起来，通过 =info files= 可以查看到 main，ld-linux.so.2，d1.so，d2.so 
+及 libc.so.6 五个ELF文件的各个段分别在内存中所占的虚拟地址范围。
+
+#+BEGIN_SRC c
+(gdb) b main 
+Breakpoint 1 at 0x8048636: file m.c, line 9.
+(gdb) r
+Starting program: /home/ubuntu/linkerAndLoader/main
+Breakpoint 1, main () at m.c:9
+9         printf("&global_init_var: %p, &global_uninit_var(%d): %p\n",
+(gdb) info files
+Symbols from "/home/ubuntu/linkerAndLoader/main".
+Unix child process:
+        Using the running image of child process 25518.
+        While running this, GDB does not access memory from...
+Local exec file:
+        `/home/ubuntu/linkerAndLoader/main', file type elf32-i386.
+        Entry point: 0x8048530
+        0x08048154 - 0x08048167 is .interp
+        0x08048168 - 0x08048188 is .note.ABI-tag
+        0x08048188 - 0x080481ac is .note.gnu.build-id
+        0x080481ac - 0x080481f0 is .gnu.hash
+        0x080481f0 - 0x08048310 is .dynsym
+        0x08048310 - 0x08048402 is .dynstr
+        0x08048402 - 0x08048426 is .gnu.version
+        0x08048428 - 0x08048448 is .gnu.version_r
+        0x08048448 - 0x08048460 is .rel.dyn
+        0x08048460 - 0x08048490 is .rel.plt
+        0x08048490 - 0x080484b3 is .init
+        0x080484c0 - 0x08048530 is .plt
+        0x08048530 - 0x08048772 is .text
+        0x08048774 - 0x08048788 is .fini
+        0x08048788 - 0x08048821 is .rodata
+        0x08048824 - 0x08048860 is .eh_frame_hdr
+        0x08048860 - 0x08048950 is .eh_frame
+        0x08049ef0 - 0x08049ef4 is .init_array
+        0x08049ef4 - 0x08049ef8 is .fini_array
+        0x08049ef8 - 0x08049efc is .jcr
+        0x08049efc - 0x08049ffc is .dynamic
+        0x08049ffc - 0x0804a000 is .got
+        0x0804a000 - 0x0804a024 is .got.plt
+        0x0804a024 - 0x0804a034 is .data
+        0x0804a040 - 0x0804a054 is .bss
+        0xf7fdc114 - 0xf7fdc138 is .note.gnu.build-id in /lib/ld-linux.so.2
+        0xf7fdc138 - 0xf7fdc1f8 is .hash in /lib/ld-linux.so.2
+        0xf7fdc1f8 - 0xf7fdc2dc is .gnu.hash in /lib/ld-linux.so.2
+        0xf7fdc2dc - 0xf7fdc4ac is .dynsym in /lib/ld-linux.so.2
+        0xf7fdc4ac - 0xf7fdc642 is .dynstr in /lib/ld-linux.so.2
+        0xf7fdc642 - 0xf7fdc67c is .gnu.version in /lib/ld-linux.so.2
+        0xf7fdc67c - 0xf7fdc744 is .gnu.version_d in /lib/ld-linux.so.2
+        0xf7fdc744 - 0xf7fdc7b4 is .rel.dyn in /lib/ld-linux.so.2
+        0xf7fdc7b4 - 0xf7fdc7e4 is .rel.plt in /lib/ld-linux.so.2
+        0xf7fdc7f0 - 0xf7fdc860 is .plt in /lib/ld-linux.so.2
+        0xf7fdc860 - 0xf7ff47ac is .text in /lib/ld-linux.so.2
+        0xf7ff47c0 - 0xf7ff8780 is .rodata in /lib/ld-linux.so.2
+        0xf7ff8780 - 0xf7ff8e04 is .eh_frame_hdr in /lib/ld-linux.so.2
+        0xf7ff8e04 - 0xf7ffb6fc is .eh_frame in /lib/ld-linux.so.2
+        0xf7ffccc0 - 0xf7ffcf34 is .data.rel.ro in /lib/ld-linux.so.2
+        0xf7ffcf34 - 0xf7ffcfec is .dynamic in /lib/ld-linux.so.2
+        0xf7ffcfec - 0xf7ffcff8 is .got in /lib/ld-linux.so.2
+        0xf7ffd000 - 0xf7ffd024 is .got.plt in /lib/ld-linux.so.2
+        0xf7ffd040 - 0xf7ffd878 is .data in /lib/ld-linux.so.2
+        0xf7ffd878 - 0xf7ffd938 is .bss in /lib/ld-linux.so.2
+        0xf7fd6114 - 0xf7fd6138 is .note.gnu.build-id in ./d1.so
+        0xf7fd6138 - 0xf7fd6178 is .gnu.hash in ./d1.so
+        0xf7fd6178 - 0xf7fd6278 is .dynsym in ./d1.so
+        0xf7fd6278 - 0xf7fd634f is .dynstr in ./d1.so
+        0xf7fd6350 - 0xf7fd6370 is .gnu.version in ./d1.so
+        0xf7fd6370 - 0xf7fd63a0 is .gnu.version_r in ./d1.so
+        0xf7fd63a0 - 0xf7fd63e8 is .rel.dyn in ./d1.so
+        0xf7fd63e8 - 0xf7fd6410 is .rel.plt in ./d1.so
+        0xf7fd6410 - 0xf7fd6433 is .init in ./d1.so
+        0xf7fd6440 - 0xf7fd64a0 is .plt in ./d1.so
+        0xf7fd64a0 - 0xf7fd663d is .text in ./d1.so
+        0xf7fd6640 - 0xf7fd6654 is .fini in ./d1.so
+        0xf7fd6654 - 0xf7fd6689 is .rodata in ./d1.so
+        0xf7fd668c - 0xf7fd66b0 is .eh_frame_hdr in ./d1.so
+        0xf7fd66b0 - 0xf7fd6738 is .eh_frame in ./d1.so
+        0xf7fd7ef4 - 0xf7fd7ef8 is .init_array in ./d1.so
+        0xf7fd7ef8 - 0xf7fd7efc is .fini_array in ./d1.so
+        0xf7fd7efc - 0xf7fd7f00 is .jcr in ./d1.so
+        0xf7fd7f00 - 0xf7fd7fe8 is .dynamic in ./d1.so
+        0xf7fd7fe8 - 0xf7fd8000 is .got in ./d1.so
+        0xf7fd8000 - 0xf7fd8020 is .got.plt in ./d1.so
+        0xf7fd8020 - 0xf7fd8024 is .data in ./d1.so
+        0xf7fd8024 - 0xf7fd802c is .bss in ./d1.so
+        0xf7fd3114 - 0xf7fd3138 is .note.gnu.build-id in ./d2.so
+        0xf7fd3138 - 0xf7fd3178 is .gnu.hash in ./d2.so
+        0xf7fd3178 - 0xf7fd3258 is .dynsym in ./d2.so
+        0xf7fd3258 - 0xf7fd3321 is .dynstr in ./d2.so
+        0xf7fd3322 - 0xf7fd333e is .gnu.version in ./d2.so
+        0xf7fd3340 - 0xf7fd3370 is .gnu.version_r in ./d2.so
+        0xf7fd3370 - 0xf7fd33b8 is .rel.dyn in ./d2.so
+        0xf7fd33b8 - 0xf7fd33d0 is .rel.plt in ./d2.so
+        0xf7fd33d0 - 0xf7fd33f3 is .init in ./d2.so
+        0xf7fd3400 - 0xf7fd3440 is .plt in ./d2.so
+        0xf7fd3440 - 0xf7fd359b is .text in ./d2.so
+        0xf7fd359c - 0xf7fd35b0 is .fini in ./d2.so
+        0xf7fd35b0 - 0xf7fd35c7 is .rodata in ./d2.so
+        0xf7fd35c8 - 0xf7fd35e4 is .eh_frame_hdr in ./d2.so
+        0xf7fd35e4 - 0xf7fd3648 is .eh_frame in ./d2.so
+        0xf7fd4efc - 0xf7fd4f00 is .init_array in ./d2.so
+        0xf7fd4f00 - 0xf7fd4f04 is .fini_array in ./d2.so
+        0xf7fd4f04 - 0xf7fd4f08 is .jcr in ./d2.so
+        0xf7fd4f08 - 0xf7fd4fe8 is .dynamic in ./d2.so
+        0xf7fd4fe8 - 0xf7fd5000 is .got in ./d2.so
+        0xf7fd5000 - 0xf7fd5018 is .got.plt in ./d2.so
+        0xf7fd5018 - 0xf7fd501c is .data in ./d2.so
+        0xf7fd501c - 0xf7fd5024 is .bss in ./d2.so
+        0xf7e10174 - 0xf7e10198 is .note.gnu.build-id in /lib32/libc.so.6
+        0xf7e10198 - 0xf7e101b8 is .note.ABI-tag in /lib32/libc.so.6
+        0xf7e101b8 - 0xf7e13ec8 is .gnu.hash in /lib32/libc.so.6
+        0xf7e13ec8 - 0xf7e1d438 is .dynsym in /lib32/libc.so.6
+        0xf7e1d438 - 0xf7e2315e is .dynstr in /lib32/libc.so.6
+        0xf7e2315e - 0xf7e2440c is .gnu.version in /lib32/libc.so.6
+        0xf7e2440c - 0xf7e24898 is .gnu.version_d in /lib32/libc.so.6
+        0xf7e24898 - 0xf7e248d8 is .gnu.version_r in /lib32/libc.so.6
+        0xf7e248d8 - 0xf7e272e8 is .rel.dyn in /lib32/libc.so.6
+        0xf7e272e8 - 0xf7e27348 is .rel.plt in /lib32/libc.so.6
+        0xf7e27350 - 0xf7e27420 is .plt in /lib32/libc.so.6
+        0xf7e27420 - 0xf7f55bfe is .text in /lib32/libc.so.6
+        0xf7f55c00 - 0xf7f56b7b is __libc_freeres_fn in /lib32/libc.so.6
+        0xf7f56b80 - 0xf7f56d57 is __libc_thread_freeres_fn in /lib32/libc.so.6
+        0xf7f56d60 - 0xf7f787b4 is .rodata in /lib32/libc.so.6
+        0xf7f787b4 - 0xf7f787c7 is .interp in /lib32/libc.so.6
+        0xf7f787c8 - 0xf7f7fc6c is .eh_frame_hdr in /lib32/libc.so.6
+        0xf7f7fc6c - 0xf7fb0e48 is .eh_frame in /lib32/libc.so.6
+        0xf7fb0e48 - 0xf7fb12a4 is .gcc_except_table in /lib32/libc.so.6
+        0xf7fb12a4 - 0xf7fb4804 is .hash in /lib32/libc.so.6
+        0xf7fb51d0 - 0xf7fb51d8 is .tdata in /lib32/libc.so.6
+        0xf7fb51d8 - 0xf7fb521c is .tbss in /lib32/libc.so.6
+        0xf7fb51d8 - 0xf7fb51e4 is .init_array in /lib32/libc.so.6
+        0xf7fb51e4 - 0xf7fb525c is __libc_subfreeres in /lib32/libc.so.6
+        0xf7fb525c - 0xf7fb5260 is __libc_atexit in /lib32/libc.so.6
+        0xf7fb5260 - 0xf7fb5270 is __libc_thread_subfreeres in /lib32/libc.so.6
+        0xf7fb5280 - 0xf7fb6da8 is .data.rel.ro in /lib32/libc.so.6
+        0xf7fb6da8 - 0xf7fb6e98 is .dynamic in /lib32/libc.so.6
+        0xf7fb6e98 - 0xf7fb6ff4 is .got in /lib32/libc.so.6
+        0xf7fb7000 - 0xf7fb703c is .got.plt in /lib32/libc.so.6
+        0xf7fb7040 - 0xf7fb7ebc is .data in /lib32/libc.so.6
+        0xf7fb7ec0 - 0xf7fbaa7c is .bss in /lib32/libc.so.6
+#+END_SRC
+
+** 动态链接库的全局变量
+从前面输出的信息可知，加载后，d1.so 的 .rel.dyn 段的起始地址是 f7fd63a0，而变量 d2\under{}global\under{}uninit 在
+该段的地址偏移是 0x3e0-0x3a0=0x40，故内存 f7fd63e0 存放的值（1ffc，因为该段在d1.so的代码段，而共享对象的代码段不会在加载时被改变）
+是该变量在文件 d1.so 中的偏移（位于 .got 表中），鉴于 .got 的起始地址是 f7fd7fe8，所以，该变量在 .got 中的地址是 f7fd7ffc 。
+
+同理，变量 d2\under{}global\under{}uninit 在 d2.so 的 .got 中的地址是 f7fd4ffc 。
+
+变量 d2\under{}global\under{}uninit 在可执行文件 main 中的地址是确定的（804a044），不需要修改的。
+
+下面利用GDB查看该变量在 d1.so 和 d2.so 中何时被修改的。
+#+BEGIN_SRC c
+(gdb) watch *0xf7fd4ffc
+Hardware watchpoint 1: *0xf7fd4ffc
+(gdb) watch *0xf7fd7ffc
+Hardware watchpoint 2: *0xf7fd7ffc
+(gdb) watch *0x804a008
+Hardware watchpoint 3: *0x804a008
+
+(gdb) r
+Starting program: /home/ubuntu/linkerAndLoader/main
+Hardware watchpoint 1: *0xf7fd4ffc
+Old value = <unreadable>
+New value = 134520900
+0xf7fe7475 in ?? () from /lib/ld-linux.so.2
+(gdb) p/x *0xf7fd4ffc
+$1 = 0x804a044
+(gdb) bt
+\#0  0xf7fe7475 in ?? () from /lib/ld-linux.so.2
+\#1  0xf7fdf3e0 in ?? () from /lib/ld-linux.so.2
+\#2  0xf7ff0f9b in ?? () from /lib/ld-linux.so.2
+\#3  0xf7fe0a0b in ?? () from /lib/ld-linux.so.2
+\#4  0xf7fdd0d7 in ?? () from /lib/ld-linux.so.2
+
+(gdb) c
+Continuing.
+Hardware watchpoint 2: *0xf7fd7ffc
+Old value = <unreadable>
+New value = 134520900
+0xf7fe7475 in ?? () from /lib/ld-linux.so.2
+
+(gdb) c
+Continuing.
+Hardware watchpoint 3: *0x804a008
+Old value = 0
+New value = -134282000
+0xf7fe7177 in ?? () from /lib/ld-linux.so.2
+(gdb) bt
+\#0  0xf7fe7177 in ?? () from /lib/ld-linux.so.2
+\#1  0xf7fdf3e0 in ?? () from /lib/ld-linux.so.2
+\#2  0xf7ff0f9b in ?? () from /lib/ld-linux.so.2
+\#3  0xf7fe0a0b in ?? () from /lib/ld-linux.so.2
+\#4  0xf7fdd0d7 in ?? () from /lib/ld-linux.so.2
+#+END_SRC
+
+可以看到，该变量最终是放在 804a044 这个内存单元的（位于 .bss ），d1.so 及 d2.so 中相应的
+ .got 表项都被作了修改以指向该内存单元。从 backtrace 可以看到，该变量的重定位是由动态连接器作出的。
+
+** 对动态链接库中函数的调用
+#+BEGIN_SRC c -n -r
+(gdb) l 15
+15        foo();
+16        fflush(stdout);
+(gdb) b 15 
+Breakpoint 1 at 0x8048674: file m.c, line 15.
+(gdb) b 16
+Breakpoint 2 at 0x8048679: file m.c, line 16.
+(gdb) r
+....
+Breakpoint 1, main () at m.c:15
+15        foo();
+(gdb) b foo@plt
+Breakpoint 3 at 0x8048520
+(gdb) b ext@plt
+Breakpoint 4 at 0xf7fd6490
+
+(gdb) c
+Continuing.
+Breakpoint 3, 0x08048520 in foo@plt ()
+(gdb) disassemble
+Dump of assembler code for function foo@plt:
+=> 0x08048520 <+0>:     jmp    *0x804a020
+   0x08048526 <+6>:     push   $0x28
+   0x0804852b <+11>:    jmp    0x80484c0
+End of assembler dump.
+(gdb) p/x *0x804a020   (ref:28thLine)
+$1 = 0x8048526
+(gdb) bt (ref:26thLine)
+#0  0x08048520 in foo@plt ()
+#1  0x08048679 in main () at m.c:15
+
+(gdb) c
+Continuing.
+Breakpoint 4, 0xf7fd6490 in ext@plt () from ./d1.so
+(gdb) p/x *0x804a020 (ref:35thLine)
+$2 = 0xf7fd661b
+(gdb) info symbol 0xf7fd661b  (ref:37thLine)
+foo in section .text of ./d1.so
+(gdb) disassemble
+Dump of assembler code for function ext@plt:
+=> 0xf7fd6490 <+0>:     jmp    *0x1c(%ebx)
+   0xf7fd6496 <+6>:     push   $0x20
+   0xf7fd649b <+11>:    jmp    0xf7fd6440
+End of assembler dump.
+(gdb) p/x $ebx
+$4 = 0xf7fd8000
+(gdb) p/x *0xf7fd801c  (ref:47thLine)
+$5 = 0xf7fd6496
+(gdb) bt   (ref:49thLine)
+#0  0xf7fd6490 in ext@plt () from ./d1.so
+#1  0xf7fd6632 in foo () from ./d1.so
+#2  0x08048679 in main () at m.c:15
+
+(gdb) c
+...
+Breakpoint 2, main () at m.c:16
+16        fflush(stdout);
+(gdb) p/x *0xf7fd801c
+$6 = 0xf7fd356b
+(gdb) info symbol 0xf7fd356b
+ext in section .text of ./d2.so
+(gdb)
+#+END_SRC
+
+GDB调试中，分别在调用 foo 之前和之后设置了断点，并在调用 foo 之前，在将要调用到的例程 foo@plt（位于 main 的.plt 段） 及 
+例程 ext@plt（位于 d1.so 的.plt 段）中设置了断点，同时，也看到了这两个例程的虚拟地址。
+
+程序运行后，首先暂停在了 foo@plt ，从[[(28thLine)][(28thLine)]]行的 backtrace 发现程序还没有进入 foo 。从[[(26thLine)][(26thLine)]]行的打印信息知道相应的 .got.plt 表项
+还没有被修正。
+
+继续执行程序后，暂停在了 ext@plt ，从[[(49thLine)][(49thLine)]]行的 backtrace 看到程序是在 foo 内部，但还没有进入 ext 。从[[(47thLine)][(47thLine)]]行的打印信息知道相应的
+ .got.plt 表项还没有被修正。另外，从[[(35thLine)][(35thLine)]]行及[[(37thLine)][(37thLine)]]行的打印信息，知道这时位于 main 的相应的 .got.plt 表项已经被修正，正确地指出了
+ foo 的地址。
+
+再次继续程序的执行，暂停在 main 的16行，这时已经调用完毕 foo 。从58行及60行的打印信息，知道这时位于 d1.so 的相应的 .got.plt 
+表项已经被修正，正确地指出了 ext 的地址。
+** 可执行文件的运行
+#+BEGIN_SRC sh
+$./main &
+[1] 26980
+&global_init_var: 0x804a02c, &global_uninit_var(0): 0x804a050
+&static_var: 0x804a030, &static_var2(0): 0x804a04c
+value returned by sbar(): 0
+&d2_global_uninit: 0x804a044
+&d2_global_uninit: 0x804a044
+&d1_global_static_uninit: 0xf777b028, &d2_global_uninit: 0x804a044
+
+$ cat /proc/26980/maps
+08048000-08049000 r-xp 00000000 ca:01 398021                             /home/ubuntu/linkerAndLoader/main
+08049000-0804a000 r--p 00000000 ca:01 398021                             /home/ubuntu/linkerAndLoader/main
+0804a000-0804b000 rw-p 00001000 ca:01 398021                             /home/ubuntu/linkerAndLoader/main
+f75b2000-f75b3000 rw-p 00000000 00:00 0
+f75b3000-f7758000 r-xp 00000000 ca:01 1441811                            /lib32/libc-2.19.so
+f7758000-f775a000 r--p 001a5000 ca:01 1441811                            /lib32/libc-2.19.so
+f775a000-f775b000 rw-p 001a7000 ca:01 1441811                            /lib32/libc-2.19.so
+f775b000-f775e000 rw-p 00000000 00:00 0
+f7775000-f7776000 rw-p 00000000 00:00 0
+f7776000-f7777000 r-xp 00000000 ca:01 398008                             /home/ubuntu/linkerAndLoader/d2.so
+f7777000-f7778000 r--p 00000000 ca:01 398008                             /home/ubuntu/linkerAndLoader/d2.so
+f7778000-f7779000 rw-p 00001000 ca:01 398008                             /home/ubuntu/linkerAndLoader/d2.so
+f7779000-f777a000 r-xp 00000000 ca:01 397991                             /home/ubuntu/linkerAndLoader/d1.so
+f777a000-f777b000 r--p 00000000 ca:01 397991                             /home/ubuntu/linkerAndLoader/d1.so
+f777b000-f777c000 rw-p 00001000 ca:01 397991                             /home/ubuntu/linkerAndLoader/d1.so
+f777c000-f777e000 rw-p 00000000 00:00 0
+f777e000-f777f000 r-xp 00000000 00:00 0                                  [vdso]
+f777f000-f779f000 r-xp 00000000 ca:01 1441804                            /lib32/ld-2.19.so
+f779f000-f77a0000 r--p 0001f000 ca:01 1441804                            /lib32/ld-2.19.so
+f77a0000-f77a1000 rw-p 00020000 ca:01 1441804                            /lib32/ld-2.19.so
+ffca7000-ffcc8000 rw-p 00000000 00:00 0                                  [stack]
+#+END_SRC
