@@ -1,0 +1,308 @@
+
+* Ethereum Homestead
+** How does Ethereum work?
+whereas the Bitcoin blockchain was purely a list of transactions, Ethereum's basic unit is 
+account. The Ethereum blockchain tracks the state of every account, and all state transactions 
+on the Ethereum blockchain are transfers of value and information between accounts.
+
+Two types of accounts:
+- Externally Owned Accounts(EOAs), which are controlled by private keys.
+- Contract Account, which are controlled by their contract code and can only be "actived" by 
+  an EOA
+
+The sender of a transaction must pay for each step of the "program" they activated, including 
+computation and memory storage.
+
+** Homestead Release
+It is the first release, introduced at block number 1,150,000 on March 14th, 2016. 
+
+Once the Ethereum blockchain reaches block 1,150,000, the Ethereum network will undergo a 
+hardfork enabling a few major changes.
+
+changes:
+- EIP2
+  - cost for creating contract via a transaction is increased from 21000 to 53000.
+	BTW, cost for creating contract via another contract remains 32000.
+  - transaction signatures whose s-value is greater than =secp256k1n/2= are now considered 
+    invalid
+  - if contract creation does not hace enough gas to pay for the final gas fee for adding the 
+	contract code to the state, the contract creation fails rather than leaving an empty 
+    contract.
+  - change the difficulty adjustment algorithm.
+- EIP 7
+  Add new opcode =DELEGATECALL=, which is similar to =CALLCODE=, except that it propagates the 
+  sender and value from the parent scope to the child scope, the child code would execute in 
+  essentially the same environment(except for reduced gas and increased callstack depth) as 
+  the parent. That is great for contracts which create contracts but do not repeat additional 
+  information which saves gas.
+- EIP8:
+  Protocol changes to ensure that all client software in use on the Ethereum network can cope 
+  with future network protocol upgrades.
+ 
+** Web 3: A platform for decentralized apps
+
+** History of Ethereum
+The Ethereum Yellow Paper serve as the technical specification for the EVM.
+
+** community
+
+[[https://www.reddit.com/r/ethereum/][Ethereum Subreddit]]: core devs are active. news, media coverage, announcements, brainstorming.
+
+[[https://ethereum.stackexchange.com/][Ethereum Stack Exchage]]: free Q&A.
+
+Gitter for daily chat, github account is needed. List of chanels:
+- [[https://gitter.im/ethereum/go-ethereum][go-ethereum]]: about geth.
+- [[https://gitter.im/ethereum/web3.js][web.js]]: JavaScript API LIB
+- [[https://gitter.im/ethereum/Solidity][Solidity]]: Solidity language
+- EIPs
+- research
+- light-client
+
+** Ethereum Clients
+Many clients: go-ethereum in go, parity in Rust, etc.
+
+Mist/Ethereum Wallet comes with bundled go-ethereum and cpp-ethereum binaries. If you want to 
+interact with Ethereum on the command-line, and to take advantage of Javascript console, the 
+you will want to install one of client directly, as well as Mist. Notice, Mist is not sufficient 
+to do mining.
+
+*** go-ethereum
+It is refered to as *geth*, which is command line interface for running a full ethereum node. 
+By geth, 
+- mine real ethereum
+- transfer funds
+- create contracts and send transactions
+- explore block history
+- etc
+
+[[https://github.com/ethereum/go-ethereum][Github]], [[https://gitter.im/ethereum/go-ethereum][Gitter]], wiki
+
+** Connecting to Ethereum Clients
+[[https://github.com/ethereum/wiki/wiki/JSON-RPC][JSON-RPC]] is the interface to interact with Ethereum clients, and, to help application 
+developers to use the interface, a number of libraries have been written, like, web3.js, 
+etc.
+
+** Account Management
+Externally accounts is refered as *accounts*. Contract account is refered as *contract*.
+
+Accounts have balance state, contracts have both balance and contract storage. The state of 
+all accounts is the state of the Ethereum network which is updated with every block and which 
+the network really needs to reach a consensus about.
+
+Accounts are indexed by their address which is derived from the public key by taking the last 
+20 bytes. Every private key/address pair is encoded in a *keyfile* in format of Json. The 
+private key in keyfile is always encrypted with the password you enter when you create the 
+account. Keyfiles are found in the =keystore= subdirectory of Ethereum node's data directory. 
+Make sure you backup your keyfiles regularly.
+
+Creating a key is to create an account, do not need to sync with blockchain, do not need to 
+run a client, do not need to connect to the internet.
+
+It is safe to transfer keyfiles betweem Ethereum nodes, but the order of accounts may change, 
+so make sure you do not rely or change the index in your script or code snippets.
+
+Command =geth acount new= is used to create an account, Notice, No need to run geth client or 
+sync up with the blockchain beforehand.
+
+Command =geth account list= is used to list all accounts with keyfiles currently in =keystore= 
+folder.
+
+To create a new account using geth, first start geth in console mode, or attach to an already 
+running instance with command =geth attach=.
+
+Skip: creating a Multi-signature Wallet in Mist.
+
+Command =geth wallet import /path/to/my/presale-wallet.json= is used to import presale wallet. 
+BTW, it also can be done by coping the keyfile into *keystore* subdirectory.
+
+To backup keyfiles, copy either the individual keyfile within the *keystore* subdirectory or 
+copy the entire *keystore* folder. To restore your *keyfiles*, copy them back into *keystore* 
+subdirectory.
+** Ether
+Ether is the name of the currency. Wei is the smallest denomination, and one ETH equals to 
+1e18 Wei.
+
+Gas is the constant cost of network resources/utilisation. 
+
+Gas Cost, static value for how much a computation costs in terms of Gas. 
+
+Gas Fee, the amount of Gas needed to be paid to run a particular transaction or contract.
+Gas Fee for a block can be used to imply the computational load, transaction volumn, or size 
+of a block. It is paid to the miners or bonded contractors in PoS.
+
+Gas Limit, the maximum amount of Gas that can used per block. It is considered the maximum 
+computational load, transaction volumn, or block size of a block, and miners can slowly 
+change this value over time. 
+
+Gas Price, how much Gas costs in terms of another currency or token like Ether. 
+
+** Ethereum Network
+[[https://ethstats.net/][EthStats.net]] is a dashboard of live statistics of the Ethereum network. It displays important 
+information such as the current block, hash difficulty, gas price. Its source code is in 
+[[https://github.com/cubedro/eth-netstats][Github]], it is coded in node.js using Websocket.
+
+Geth finds peers through discovery protocol. In the protocol, nodes are gossipping with each 
+other to find out other nodes. In order to get going initially, geth uses a set of bootstrap 
+nodes whose endpoints are recorded in the source code.
+
+#+BEGIN_SRC sh :file geth
+# how many nodes connected
+net.peerCount
+
+# list of currently connected nodes 
+admin.peers
+#+END_SRC
+
+If you already have a full Ethereum node synced, you can export the blockchain data from the 
+fully synced node with =geth export filename=, and import it into your new node with 
+=geth import filename=.
+
+Static nodes are peers you always want to connect to. Static nodes are re-connected on 
+disconnects. You can add static nodes at runtime with =admin.addPeer= in geth. You can add 
+permanent static nodes by editting file =static-nodes.json=.
+
+The most common reasons that a node cannot get connected are:
+- local time of the node might be incorrect, even 12 seconds too fast can be lead to 0 peers.
+- firewall could prevent UDP traffic.
+
+
+* Inside a Transaction
+[[https://medium.com/@codetractio/inside-an-ethereum-transaction-fa94ffca912f][Inside an Ethereum Transaction]] 
+
+Ethereum uses ECDSA with secp256k1's curve. 
+
+The private key is just random 256 bit data but cannot be zero and must less than the order 
+of the curve.
+
+The public key can be drived from the private key.
+
+The address is the last 160bits of SHA3-256(Keccak) hash of the public key. It is possible 
+for multiple private keys to have the same address, so an Ethereum account has the following 
+attributes:
+- *nonce*, the count of outgoing transactions, starting with 0.
+- *storageRoot*, the hash associated with the storage of the account.
+- *codeHash*, the hash of the code governing the account. It is empty for ETH.
+
+To sign a transaction, like ={from:"...", to:"...", value:...}=, it is needed to RLP encode 
+the transaction and hash it.
+
+* Practice
+** ETH transfer
+
+#+BEGIN_SRC sh :file geth
+eth.getBalance("0xa1f522f56fafbaa705f4edb59169e51e7fd6859e")
+
+personal.unlockAccount("0xa1f522f56fafbaa705f4edb59169e51e7fd6859e", "password", 1500) 
+
+# returns tx hash
+eth.sendTransaction({from:"0xa1f522f56fafbaa705f4edb59169e51e7fd6859e",
+      to:eth.accounts[1],value:2000000000000,
+      nonce:eth.getTransactionCount("0xa1f522f56fafbaa705f4edb59169e51e7fd6859e")})
+
+# return tx details, like blocknumber, blockhash, transactionIndex, hash, from, to, 
+# value, nonce, gas, gasPrice
+eth.getTransaction("0xa8b1b286f6dcce4d2ff34fae4817660315e557f3ad99ba06c0704fc2fa14c03b")
+#+END_SRC
+
+Note,
+- unlock the account
+  It is necessary before sending transaction, because =eth.sendTransaction= need to sign the 
+  transaction, that is also the reason for taking sender address as a parameter.
+- *nonce*
+  [[http://zeltsinger.com/2016/11/07/neat-ethereum-tricks-the-transaction-nonce/][nonce]] is not a random value in Ethereum. It is the order of transactions sent by the 
+  address *from*, increased whenever a tx transfer or a contract creation is made by the 
+  owner of *from*, no matter whether the transfer is based on contract. It is one of two 
+  parameters, another one is sender address, to calculate the new contract address. It 
+  allows to overwrite a pending transaction that use the same *nonce*. 
+- parameters for =eth.sendTransaction=
+  *gas* and *gasPrice* are optional, can be obtained by system automatically.
+  *nonce* is optional, and can obtain it by =eth.getTransactionCount(address from)=
+- Tx Fee  
+  Tx fee = Gas used by Txn * Gas Price. Gas used by Txn can be got through etherscan.io.
+  BTW, *gas* is *Gas Limit*.
+- ETH transfer can also be fulfilled by =eth.sendRawTransaction=.
+  refer to erc20 below.
+
+** ERC20 transfer
+#+BEGIN_SRC solidity :file erc20_standard 
+contract ERC20 {
+    function totalSupply() constant returns (uint totalSupply); // ABI: 18160ddd
+    function balanceOf(address _owner) constant returns (uint balance); // ABI: 70a08231
+    function transfer(address _to, uint _value) returns (bool success); // ABI: a9059cbb
+    function TransferFrom(address _from, address _to, uint _value) returns (bool success); // ABI: 23b872dd 
+    function approve(address _spender, uint _value) returns (bool success); // ABI: 095ea7b3
+    function allowance(address _owner, address _spender) constant returns (uint remaining); // ABI: dd62ed3e
+    event Transfer(address indexed _from, address indexed _to, uint _value); 
+    event Approve(address indexed _owner, address indexed _spender, uint _value);  
+}
+#+END_SRC
+
+#+BEGIN_SRC sh :file geth
+#  "70a08231" is first 4 bytes of the Keccak hash erc20 balanceOf(address). 
+# "0x54fb2b0...0b5505f" is contract address, "0xa1f522f...fd6859e" is user address,
+eth.call({to:"0x54fb2b073926f20aa46604b00ccab89e50b5505f",
+          data:"0x70a08231000000000000000000000000a1f522f56fafbaa705f4edb59169e51e7fd6859e"})
+# "0x0000000000000000000000000000000000000000000000000000000000000011"
+
+personal.unlockAccount("0xa1f522f56fafbaa705f4edb59169e51e7fd6859e", "password", 1500) 
+
+var rawTx = {
+    from:"0xa1f522f56fafbaa705f4edb59169e51e7fd6859e",
+    to:"0x54fb2b073926f20aa46604b00ccab89e50b5505f",
+    value:0,
+    data:"0xa9059cbb000000000000000000000000d0640f42c39fbcf3f36df165e115a9138943271b0000000000000000000000000000000000000000000000000000000000000010"
+}
+var signTx = eth.signTransaction(rawTx)
+# { 
+#   raw: "0xf8aa01850ba43b740083015f909454fb2b073926f20aa46604b00ccab89e50b5505f80b844a9059cbb000000000000000000000000d0640f42c39fbcf3f36df165e115a9138943271b00000000000000000000000000000000000000000000000000000000000000102aa08fbca33ec6560a675717cdbe87ed80cd6e3fe65bd4a7e175666f2e70b69e4fc2a073a1782de6dae7acdc00625adb79959a6f4f7b6feb56b1e215ddfb7f007e543e",
+#   tx: {
+#     gas: "0x15f90",
+#     gasPrice: "0xba43b7400",
+#     hash: "0x77d311a726abab745f0613e1fc414a7a87a7ad0b0bf3e280f74cfb1870477e33",
+#     input: "0xa9059cbb000000000000000000000000d0640f42c39fbcf3f36df165e115a9138943271b0000000000000000000000000000000000000000000000000000000000000010",
+#     nonce: "0x1",
+#     r: "0x8fbca33ec6560a675717cdbe87ed80cd6e3fe65bd4a7e175666f2e70b69e4fc2",
+#     s: "0x73a1782de6dae7acdc00625adb79959a6f4f7b6feb56b1e215ddfb7f007e543e",
+#     to: "0x54fb2b073926f20aa46604b00ccab89e50b5505f",
+#     v: "0x2a",
+#     value: "0x0"
+#   }
+# }
+
+eth.sendRawTransaction(signTx.raw)
+# 0x77d311a726abab745f0613e1fc414a7a87a7ad0b0bf3e280f74cfb1870477e33
+
+eth.call({to:"0x54fb2b073926f20aa46604b00ccab89e50b5505f",
+          data:"0x70a08231000000000000000000000000a1f522f56fafbaa705f4edb59169e51e7fd6859e"})
+# "0x0000000000000000000000000000000000000000000000000000000000000001"  
+#+END_SRC
+
+- *gas*, *gasPrice*, *nonce* are obtained automatically.
+- *value* must be 0 for erc20 coin transfer.
+- *to* is contract address.
+- Tx fee is payed in Ether instead of erc20 coin.
+  Tx fee = Gas used by Txn * Gas Price. Gas used by Txn can be got through etherscan.io.
+  BTW, *gas* is *Gas Limit*.
+- erc20 transfer can also be made by =eth.sendTransaction= as described in ETH transfer above.
+** ETH and ERC20 transfer
+#+BEGIN_SRC sh :file geth
+var rawTx = {
+  data: "0xa9059cbb000000000000000000000000d0640f42c39fbcf3f36df165e115a9138943271b0000000000000000000000000000000000000000000000000000000000000001",
+  from: "0xa1f522f56fafbaa705f4edb59169e51e7fd6859e",
+  to: "0x54fb2b073926f20aa46604b00ccab89e50b5505f",
+  value: 100000000000
+}
+
+eth.sendTransaction(rawTx)
+# "0x56dc909eae82478882b3f410a7332584bdfe0358d5812243e49461a8f073b98d"
+#+END_SRC
+
+Note,
+- *value* is not zero when try to transfer ERC20 coin
+- tx hash is returned 
+- No Ether transfer happened actually
+- No ERC20 transfer happened actually
+- Tx Fee is paid actually
+** contract creation
+Contract can be created with =eth.sendTransaction=, *to* should be omitted, *data* should be 
+the code.

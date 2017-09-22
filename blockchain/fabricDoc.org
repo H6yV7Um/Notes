@@ -1,0 +1,898 @@
+* Concepts
+Channel allows a group of participants to create a separate ledger of transactions. If two 
+participants form a channel, then those participants - and no thers - have copies of the 
+ledger for that channel. 
+
+A ledger subsystem comprise two components: the *world state* and the *transaction log*.
+The *world state* is a database of the ledger and records the state of ledger at a given 
+point in time. The *transaction log* records all transactions which have resulted in the 
+current value of the *world state*.
+
+Fabric smart contracts are written in *chaincode* and are invoked by an App external to 
+the blockchain. In most cases, chaincode only interacts the world state, and not the 
+transaction log.
+
+Transactions must be written to the ledger in the order in which they occur, even though 
+they might be between different sets of participants within the network. Fabric allows 
+network starters to choose a consensus mechanism, like SOLO, Kafka, SBFT, etc.
+
+** Fabric Capabilities
+- Identity management
+  manage user IDs, authenticate all participants, provide Access control list.
+  Ex, a user ID could be permitted to invoke a chaincode app, but blocked from deploying 
+  new chaincode.
+  Within Fabric network, members know each other(identity), but they do not what each 
+  other are doing(privacy and confidentiality).
+- Privacy and confidentiality
+  Private channels are restricted messaging paths, all data, including transaction, 
+  member and channel information, on a channel are invisible and inaccessable to any 
+  network members not explicitly granted access to that channel.
+- Efficient processing
+  Fabric assigns network roles by node type.
+  Transaction execution is separated from transaction ordering and commitement. 
+  Execution prior to ordering them. Each peer node can process multiple transactions 
+  simultaneously, also, Peer node is responsible for ledger maintainance. Ordering 
+  nodes are responsible for ordering(consensus) workloads. All peer nodes do not 
+  trust all ordering nodes, and vice versa.
+- Chaincode functionality
+  Chaincode defines parameters for a change of asset ownership.
+  System chaincode defines operating parameters for the entire channel.
+  Lifecycle and configuration system chaincode defines the rules for the channel.
+  Endorsement and validation system chaincode defines the requirements for endorsing 
+  and validating tracsactions.
+- Modular desgin
+  Algorithms for identity, ordering(consensus) and encryption can be plugged in.
+
+** Fabric model
+*** Assets
+Assets means anything with monetary value over the network, ranges from tangible(real 
+estate) to intangible(intellentual property).
+
+Assets are represented in Fabric as a collection of key-value pairs, with state change 
+records as transactions on a channel ledger. Assets can be represented in binary and/or 
+JSON.
+
+Assets can be defined and used with Hyperledger Composer tool.
+*** Chaincode
+Chaincode is software defining assets and the tracsaction instructions for modifying 
+the assets. Chaincode execute against the ledger current state database and are 
+initiated through a tracsaction proposal, result in a set of key value writes(write 
+set) that can be submitted to the network and applied to the ledger on all peers.
+
+chaincode execution is partitioned from transaction ordering, limiting the required 
+levels of trust and verufucation across node types.
+**** Ledger feature
+The immutable, shared ledger encodes the entire transaction history for each channel.
+
+Each transaction results in a set of asset key-value pairs that are commited to the 
+ledger as creates, updates, or deletes.
+
+There is one ledger per channel. Each peer maintains a copy of the ledger for each 
+channel of which they are member.
+*** Privacy through Channls
+Chaincode can be installed only on peers that need to access the asset states to 
+perform reads abd writes, in othere words, if a chaincode is not installed on a 
+peer, it will not be able to properly interface with the ledger.
+
+Values within chaincode can be encrypted(partly or totally) using common 
+cryptographic algorithms.
+*** Security and Membership Services
+All participants have their identities. Public Key Infrastructure is used to generate 
+cryptographic certificates which are tied to user. Access control can be manipulated 
+and governed on the broader network and on channel levels.
+*** Consensus
+
+* Prerequites
+- cURL
+- Docker 1.12 or greater
+  Docker Compose is supposed to be installed, check its version with =docker-compose --version=
+- golang 1.7
+- download fabric source code in $GOPATH
+
+* Tutorials
+Prerequites
+- install Fabric with its installer, which contains Docker as well.
+- install Fabric Samples
+  #+BEGIN_SRC sh
+  cd $GOPATH/src/github.com/hyperledger/
+  git clone https://github.com/hyperledger/fabric-samples.git
+  cd fabric-samples
+  #+END_SRC
+- Platform-specific Binaries
+  #+BEGIN_SRC sh
+  curl -sSL https://goo.gl/iX9dek | bash
+  export PATH=<path to download location>/bin:$PATH
+  #+END_SRC
+  The command above retrieves platform-specific binaries, like 
+  - cryptogen
+  - configtxgen
+  - configtxlator
+  - peer
+  Also, it download Fabric docker images int local Docker registry.
+
+Four tutorials are given.
+- one is oriented to App Developer with Fabric Node SDK.
+- one is oriented towards Fabric network operater.
+- one is oritented to developer.
+- one is oriented to operators.
+
+* Operations guide
+** MSP
+MSP abstracts away all cryptographic mechanisms and protocol behind issuing and validating 
+certificates, and user authentication. MSP defines its own notion of identity, and the 
+rules by which those identities are governed(identity validation) and authenticated(
+signature generation and verification).
+
+Fabric blockchain network can be governed by one or more MPSs.
+
+To setup an instance of MSP, its configuration needs to be specified locally at each peer 
+and orderer(to enable, and orderer signing), and on the channels to enable peer, orderer, 
+client identity validation, and respective signature verification(authentication) by and 
+for all channel members.
+
+MSP ID representing an organization is to be referenced in a channel, it is required to be 
+unique per MSP instance.
+
+Parameters needs to be specified for default implementation of MSP
+- root of trust
+  a list of self-signed certificates.
+- intermediate CAs (optional) 
+  cerified by exactly one of the certificates in the root of trust.
+  for certificate validation.
+- certificates representing the administrator of this MSP
+  contains a verifiable certificate path to exactly one of the certificates of the root of 
+  trust.
+- Organization Units
+  valid members of this MSP.
+- certificate revocation list(CRL) (optional)
+  each corresponds to exactly one of the intermediate or root MSP Certificate Authorities.
+- TLS root of trust for TLS certificate
+  self-signed
+- intermediate TLS CAs (optional)
+  certified by exactly one of the certicates in TLS root of trust.
+ 
+valid identities for this MSP instance are required to follow
+- in the form of X.509 certificate.
+- has a verifiable certificate path to exactly one of the root of trust certificates.
+- not include in any CRL
+- list one or more of Organization Units
+
+in addition to verification related parameters, for the node which signs ot authenticates, 
+others needs to specify 
+- signing key, like ECDSA, for signing by the node
+- the node's X.509 certificate 
+
+The MSP identity nerve expire, it can only be revoked by adding to CRLs.
+
+To generate MSP certificates and their signing keys, tools can be used
+- cryptogen, or
+- Fabric CA
+
+To setup a local MSP on the peer or orderer side, six folders and a file 
+- folder =admincerts=
+  PEM files for each administrator certificate
+- folder =cacerts=
+  PEM files for each root CA's certicates
+- folder =intermediatecerts= (optional)
+  PEM files for each intermediate CA's certicate
+- folder =crls=  (optional)
+  contains CRLs
+- folder =keystore= 
+  A PEM file with the node's sigining key.
+- folder =tlscacerts= (optional)
+  PEM files for each TLS root CA's certicate
+- folder =tlsintermediatecerts=  (optional) 
+  PEM files for each intermediate TLS CA's certicate
+- file =config.yaml= (optional)
+  contains an array =OrganizationUnitsIdentifiers=, each member in form of 
+  =<Certificate, OrganizationalUnitIdentifier>=, where =Certificate= is relative path to 
+  the certificate of the root CA or intermediate CA which should certify members of this 
+  organization unit.
+
+In core.yaml (for peer), the path to mspconfig folder, parameter =mspConfigPath=, shoule 
+be relative to FABRIC_CFG_PATH. 
+In ordererl.yaml (for orderer),the path to mspconfig folder, parameter =LocalMSPDir=, 
+shoule be relative to FABRIC_CFG_PATH.
+
+At the gensis of the system, verification parameters of all the MSPs that appear in the 
+network need to be specified, and included in system channel's gensis block. Verification 
+parameters consists of MSP identifier, root of trust certificate, intermediate CA and 
+admin certificates, as well as OU and CRLs. The system gensis block is provided to the 
+orderers at setup phase, and allow them to authenticate channel creation requests.
+
+For application channel, verification components of only the MSPs that govern a channel 
+need to reside in the channel's gensis block. The application is respond to ensure that 
+correct MSP configuration information is include in the gensis block of a channel prior 
+to instructing one or more of peers to join the channel.
+
+Whenn bootstraping a channel with cofigtxgen tool, MSP configuration includes verification 
+parameters of MSP in mspconfig folder, and set that path in configtx.yaml.
+
+Reconfiguration of MSP on the channel is achieved through the creation of config_update 
+object by owner of administrator certificates of the MSP. The client application managed 
+by the admin would then announce the update to channels in which this MSP appears.
+
+Best Practices
+- Mapping between organization and MSPs
+  recomendation: one-to-one mapping.
+  - one organization employing various MSPs
+    E.g. an organization has several divisions each represented by its MSP.
+    A peer can only be owned by single MSP, cannot recognize peers with identities from 
+    other MSPs. Peer share through gossip organization scoped data with other peers in the 
+    same subdivision, NOT with the full set of providers constituting the actual organization.
+  - several organization using single MSP
+    Peers propagate organization-scoped message to the peers that have an identity under 
+    the same MSP regardless of whether they belong to same organization.
+- Grant access to different channels for different division in an organziation
+  two ways
+  - define one MSP to accommodate membership for all organization's members
+    The MSP would consists of root CAs, intermediate CAs and admin certificates, and 
+    membership identities would include organization unit a member belong to. Policies, 
+    like read/write policy of a channel or endorsement policy of a chaincode, can be then 
+    defined to capture members of the OU.
+    Peers would gossip with other peers that have an identity under the local MSP regardless 
+    whether they belong to same organization.
+  - define one MSP to represent each division
+- 
+** channel configuration (configtx)
+Configure transaction, one per channel, is referred as /configtx/.
+
+Properties of Channel configuration
+- versioned
+- permissioned
+  Each element of the configuration has an associated policy which governs whether or not 
+  modification of that element is permitted.
+- hierarchical
+  
+Configuration is stored as a transaction of type =HeaderType_CONFIG= in a block with no 
+other transactions, and these blocks are referred to as Configuration Blocks, the first of 
+which is referred to as the Gensis Block.
+
+The struture of configuration is defined in =fabric/protos/common/configtx.proto=. The 
+Envelope of type =HeaderType_CONFIG= encodes a =ConfigEnvelope= message as the =Payload 
+data= field.
+
+#+BEGIN_SRC proto
+message ConfigEnvelope {
+  Config config = 1;  // currently commited configuration
+  Envelope last_update = 2; // only necessary when valicating the configuration
+}
+
+message Config {
+  uint64 sequence = 1;   // steped for each commited configuration
+  ConfigGroup channel_group = 2; // root group which contains the configuration
+}
+
+message ConfigGroup {
+  uint64 version = 1;  // increased when the element is modified
+  map<string, ConfigGroup> groups = 2;
+  map<string, ConfigValue> values = 3;
+  map<string, ConfigPolicy> policies = 4;
+  // policy for adding/removing elements to Values, Policies, or Group maps.
+  string mod_policy = 5; 
+}
+
+message ConfigValue {
+  uint64 version = 1;  // increased when the element is modified
+  bytes value = 2;
+  string mod_policy = 3;  // policy for changing the Value
+}
+
+message ConfigPolicy {
+  uint64 version = 1;  // increased when the element is modified
+  Policy policy  = 2;
+  string mod_policy = 3;  // policy for changing the Policy
+}
+#+END_SRC
+
+Each group defines a level in the config hierarchy, and has an associated set of values 
+and policies. If a =mod_policy= does not exist, the item cannot be modified.
+
+Configuration updates are submitted as an =Envelope= message of type 
+=HeaderType_CONFIG_UPDATE=. The =Payload data= of the transaction is a marshaled 
+=ConfigUpdateEnvelope=.
+
+#+BEGIN_SRC proto
+message ConfigUpdateEnvelope {
+  bytes config_update = 1;
+  // the set of signatures which authorizes the config update
+  repeated ConfigSignature signatures = 2;
+}
+
+message ConfigSignature {
+  bytes signature_header = 1; //defined for standaed transaction
+  // signature is over the concatenation of the signature_header bytes 
+  // and the config_update from the ConfigUpdateEnvelope
+  bytes signature = 2;
+}
+
+// config_update of ConfigUpdateEnvelope are a marshaled ConfigUpdate messages
+message ConfigUpdate { 
+  string channel_id = 1;
+  ConfigGroup read_set = 2;
+  ConfigGroup write_set = 3;
+}
+#+END_SRC
+
+The =read_set= specifies a subset of the existing configuration in which only the =version= 
+field is set. E.g. to include the /Application/ group in the =read_set=, its parent, the 
+channel group, must also be included in the read set, but the =channel= group does not need 
+to populate all of the keys.
+
+The =write_set= specifies the pieces of configuration which are modified. A write to an 
+element deep in the hierarchy must contain the higher level elements in its =write_set= 
+as well. However, for any element in the =write_set= which is also specified in the 
+=read_set= at the same version, the element should be specified sparsely, just as in 
+the =read_set=.
+
+when the =CONFIG_UPDATE= is received, the orderer computes the resulting =CONFIG= by 
+- verifing the =channel_id= and =read_set= 
+  All elements in =read_set= must exist at given version.
+- computing update set 
+  collecting all elements in the =write_set= which do not appear at the same version in =read-set=
+- verifing each element in update set increments the version number of the element update 
+  by exactly 1.
+- verifing signature set attached to the =ConfigUpdateEnvelope=
+  it should satisfy =mod_policy= for each element in the update set.
+- 
+
+when the peer receives the configuration block, it should 
+
+Orderer system channel configuration
+
+The ordering system channel needs to define ordering parameters, and consortiums for 
+creating channels. Must exactly one ordering system channel for an ordering service, and 
+its the first channel to be booostraped. Never define an Application section inside of 
+ordering system channel genesis configuration unless for testing. Any member with read 
+access to the ordering system channel may see all channel creations.
+
+** channel configuration (configtxgen)
+
+** reconfiguring with configtxlator
+Independant of SDKs.
+
+Channel configuration as a transaction is stored in configure blocks of a channel. 
+
+configtxlator tool provides an REST API with which consumers of any SDK may interact to 
+update configuration updates.
+
+The configtxlator implies configtx and translator to tell the tool simply converts between 
+different equivalent data representations. Not generate configuration. Not submit/retrieve 
+configuration. Not modify configuration.
+
+It supports converting the native configuration format to/from a human readable JSON, as 
+well as computing configuration updates based on the difference between two configurations.
+=jsonpb= is ineffective to do the translation because that some fields must be signed over.
+
+The configtxlator is recommend to run as a sandboxed container, locally with the application, 
+so that there is a dedicated configtxlator process for each consumer of it. Reason behind is 
+the configtxlator service has no crypto material, no authorization or access control.
+
+** Endorsement policy
+Endorsement policies are used to instruct a peer on how to decide whether a transaction is 
+properly endorsed, for example, all endorsements are valid, an appropriate number of 
+endorsements collected.
+
+Example for endorsement policy,
+=T(2, 'A', 'B', 'C')=, requestes signature from any 2 principals out of 'A', 'B' or 'C'.
+=T(1, 'A', T(2, 'B', 'C'))= requests either one signature from principal A or 2 signatures 
+from B and C.
+
+A principal is described in terms of MSP that is tasked to validate the identity of the 
+signer and of the role that the signer has within that MSP. Two roles are supported: 
+*member* and *admin*. Example, =Org0.admin= means any administrator of the =Org0= MSP.
+
+** Error handling
+Error handling framework in *common/errors=*.
+
+** Logging control
+* Architecture
+system chaincode is a special chaincode for management functions and parameters.
+
+
+* Security
+** Business sccurity requirements
+*** Incorporation of Identity and role management
+cryptographic continuity, addressing proven, demonstrated indetities.
+
+Transaction and consumer interaction with finantial instatitutions need to be mapped to account holders.
+
+Contract requires demonstrated affiliation with specific institution.
+
+Accountability, which means that users who misbehave can be traced back and be set accountable for their action.
+
+Non-frameability, which means that an honest user can not be framed to be accused as responsible for transactions 
+originated by other user.
+ 
+*** Transaction privacy
+Transaction anonymity, where the owner of a transaction is hidden among the so called anonymity set, which is the set of users.
+
+Transaction ublinkability, where two or more transactions of the same use should no be linked as such.
+
+*** Reconciling transaction privacy with idetity management
+- add certificates to transactions to implement a "permissioned" blockchain.
+- utilize a two-level system
+- (relatively) static enrollment certificates(ECerts), acquired via registration with an enrollment certificate authority.
+- transaction certificates(TCerts) that faithfully but pseudonymously represente enrolled users acquired via a trabsaction CA.
+- offer mechanisms to conceal the content of transactions to unthorized members of the system.
+
+Audit. check a certain transaction, or a certain group of transactions, the activity of a particular user, the operation of the system itself.
+** User Privacy through Membership Services
+A Public Key Infrastructure(PKI) ensure not only the secure exchange of data over network, but also affirms the identity of the other party. 
+A PKI manages the generation, distribution and revocation of keys and digital ceritificates. Digital certificates are used to establish user 
+credentials and to sign messages. Typically a PKI has a CA, a RA, a certificate database, and a certificate storage. A RA is a trusted party 
+that authenticates users and vets the legitimacy of data, certicates or other evidence that can reflect user's identity or other properties.
+A CA, upon advice from a RA, issues digital certificates for specific users and is certified directly or hierarchically by a root CA. 
+
+PKI has
+- Root Certufucate Authority (Root CA)
+  represents the trust anchor for the PKI scheme.
+  is the top-most CA in the PKI hierarchy.
+- Registration Authority (RA)
+  a trusted entity that is responsible for out-of-band communication with the user to cvalidate his identity and role.
+  It creates registration credentials needed for enrollment and information on root of trust.
+- ECA
+  issue Enrollment Certificates(ECerts) after validating the registration credentials provided by the user.
+- TCA
+  issue Transaction Certificates(TCerts) after validating the enrollment credentials provided by the user.
+- TLS Certificate Authority (TLS-CA) 
+  issue TLS certificates and credentials that allow the user to make use of its network. 
+
+- ECerts
+  a long-term certificate, issued for all roles.
+  No expiration/revocation.
+  contains the identity/enrollmentID of the owner.
+  two usages
+  - Model A
+    used to offer only nominal entity-authentiacation for TCert request and/or within transaction.
+    contain the public part of two key pairs: a signature key-pair and encryption/key agreement key-pair.
+    ECerts are accessible to everyone.
+  - Model B
+    used to offer only nominal entity-authentication for TCert request.
+    contain the public part of a signature key-pair.
+    ECerts are accessible to only TCA and auditors.
+    They are invisible to transactions.
+- TCerts
+  a shor-term certificates for each teransaction, issued only to users.
+  No revocation. Expiration is via the validity peroid time window.
+  They include the public part of a signature key-pair.
+  They could be configured to include the public part of a key agreement key pair(as well as digital signature verification public key). If 
+  so, the ECert need not also contain encryotion or key agreement public keys.
+  uniquely associated to the owner, and, through configuration, this association is known only by the TCA and authorized auditors.
+  may be configured to not carry information of the identity of the user.
+  For auditability and accountability, TCA can retrieve TCerts of a given identity, or retrieve the owner if a TCert.
+  TCert structure: Skip
+ 
+*** User Enrollment Process
+**** offline phase
+User present strong identification credentials(proof of ID) to RA offline, RA creates an account for the user, and returns the associated 
+username/password and trust anchor(TLS-CA Cert) to the user.
+**** online phase
+User connects to the client to request to be enrolled in the system. User sends his username and password to the client.
+
+Client sends the request to ECA along with it enrollment public key and additional identitity information like username/password. 
+ECA verifies that user exist in the database and has right to submit his enrollment public key, then ECA construct, signs and sends back 
+to the client an ECert that contains the user's enrollment public key. It also sends the ECA-Cert.
+
+Client verified that public key inside the ECert is the one originally submited by the client(ECA is not cheating).
+
+Client sends a registration request to TLS-CA along with its public key and identity information. TLS-CA vcerifies the user is in database.
+TLS-CA generate, signs a TLS-Cert that contains user's TLS public key, then send it together with TLS-CA Cert.
+
+Client verified that public key inside the TLS-Cert is the one originally submited by the client.
+
+Client saves all certificates in local storage for both certificatess
+*** Expiration and revocation of certificates
+The time window of expiration is expressed by 'validity period' field. To guarantee that the expiration of validity peroids is done in a 
+consistent manner across all validators, the concept of validity peroid identifier is introduced. This identifier act as a logical clock 
+enabling system to uniquely identify identity a validity peroid. At gensis time, the 'current validity period' of the chain gets initialized 
+by the TCA. The validity period identifier is given monotonically increasing values over time, such that it imposes a total order among 
+validity periods.
+
+System transaction together with validity period identifier are used to announce the expiration of a validity period to the blockchain.
+System transaction is defined in the genesis block and are part of the infrastructure. The validity period identifier is updated periodically 
+by the TCA invoking a system chaincode. Only TCA is allowed to update the identifier. Two fields in transaction certificate reflecting 
+the identifier: 'not-before' and 'not-after'.
+
+** Transaction security offering at the infrastructure level
+Application performs access control for the invocation of chaincode.
+
+*** Security Lifecycle of Transaction
+
+- when creating chaincode 
+
+- when invoking and querying transaction
+
+- validation 
+  - pre-validation phase
+    validate the transaction certificate against the accepted root certificate authority.
+    verify transaction certificate signature included in the transaction(statically).
+    check whether the transaction is a replay.
+  - consensus phase
+    add the transaction to the total order of transaction(ultimately included in ledger)
+  - pre-execution phase
+    verify the validity of the transaction/enrollment certificate against current validity period.
+    decrypt the transaction if the transaction is encrypted.
+    check that the transaction's plaintext is correctly formed, like, invocation access control is respected, TCerts are correcty formed.
+    mini replay-attack check is also performed within the transactions of the currently processed block.
+  - execution phase
+    the decryped chaincode is passed to a container, along with the associated code metadata, and is executed.
+  - commit phase
+    encypted updates of the chaincode state is commited to the ledger with the transaction itself.
+  
+It seems it does not quite for fabric V1.0.
+*** Transaction confidentiality
+For chaincode with confidentiality, both deploy and invoke transaction remains concealed, it should not be able to associate invocation
+(invoke transaction) of a chaincode to the chaincode itself(deploy transaction).
+
+Access control of chaincode function.
+
+Access control on the application.
+
+**** Confidentiality against users
+
+
+* building
+** make cryptogen
+error: ltdl.h not found
+fix: brew install libtool
+** make peer
+error: bzip2 data invalid: bad magic value in continuation file
+fix:   brew install gnu-tar --with-default-names; brew install libtool; make clean; make peer
+ 
+
+* Rocket Chat
+=peer cli= does not support multi-peer endorsements wheres SDK does. 
+
+#+BEGIN_SRC sh
+// way to decode channel.tx into channel.json
+configtxlator start 
+curl -X POST --data-binary @channel.tx http://localhost:7059/protolator/decode/common.Envelope -o channel.json 
+#+END_SRC 
+
+Endorsement can be done automatically or through a mixture of automated checks and mannual verification.
+
+The peer and the orderer do not need a connection to fabric-ca.
+
+chaincode must be installed on each individual peer. Only an administrator from peer's organization can install chaincode. An administrator 
+is defined as the holder of a certicate which is part of the admnincerts for the peer's local MSP.
+
+In order to instantiate chaincode on a channel, the submiter of the transaction must be a member of an organization which is part of the 
+channel (and have write access) and if you do not attach an instantiation policy must again be an administrator for its organization.
+
+In Fabric, consistency across nodes is achieved by a combination of endorsement policies, commit block MVCC checks, orderer consensus. 
+Consensus(like PBFT) is for orderers to agree on the transactions order.
+
+Fabric has
+- block storage in a file system(chain of block)
+- stateDB (contains current value of all keys)
+- historyDB (an index into block storage. index is on chaincode~key~blocknum~txnum)
+It takes block storage as ledger, stateDB is used so that chaincode can get/put state efficiently.
+Current values of all keys are stored in stateDB, and the past values of keys are stored in the block.
+
+You can decode the certs with 
+#+BEGIN_SRC sh
+openssl x509 -in ca.crt -text -noout
+#+END_SRC
+
+
+* Peer Code
+
+
+msp.MSPConfig.Config.Name: Default  // refer to localMSPID defined in ./core.yaml
+msp.MSPConfig.Config.RootCert: msp/cacerts/
+msp.MSPConfig.Config.TlsRootCerts: msp/tlsCACerts/
+msp.MSPConfig.Config.Admins: msp/admincerts/
+msp.MSPConfig.Config.SigningIdentity.PublicSigner: msp/signcerts/
+msp.MSPConfig.Config.SigningIdentity.PrivateSigner: msp/keystore/
+msp.MSPConfig.Config.OrganizationalUnitIdentifiers: [{Certificate: contents of msp/cacerts/cacert.pem, OrganizationUnitIdentifier: COP}]  // related to msp/config.yaml
+msp.MSPConfig.Config.CryptoConfig: {SignatureHashFamily: "SHA2", IdentityIdentifierHashFunction: "SHA256"}
+
+msp.bccspmsp.bccsp: defaultbccsp
+msp.bccspmsp.name: msp.MSPConfig.Config.Name
+msp.bccspmsp.CryptoConfig: msp.MSPConfig.Config.CryptoConfig
+
+
+msp.(*bccspmsp).Setup()  mspimpl.go:299
+
+command execution
+- c.initializers[i]()
+- x.PersistentPreRunE / x.PersistentPreRun where x is one of itself and his decendants.
+- c.PreRunE / c.PreRun
+- c.RunE / c.Run
+- c.PostRunE / c.PostRun
+- x.PersistentPostRunE / x.PersistentPostRun where x is one of itself and his decendants.
+* Practice
+** cryptogen
+
+#+BEGIN_SRC sh :file build.log
+~/go/src/github.com/hyperledger/fabric $ make -w cryptogen
+make: Entering directory `/Users/howardhou/go/src/github.com/hyperledger/fabric'
+build/bin/cryptogen
+CGO_CFLAGS=" " GOBIN=/Users/howardhou/go/src/github.com/hyperledger/fabric/build/bin go install -tags "" -ldflags "-X github.com/hyperledger/fabric/common/tools/cryptogen/metadata.Version=1.0.1-snapshot-d9c32029" github.com/hyperledger/fabric/common/tools/cryptogen
+Binary available as build/bin/cryptogen
+make: Leaving directory `/Users/howardhou/go/src/github.com/hyperledger/fabric'
+#+END_SRC
+
+=cryptogen generate --config=./crypto-config.yaml== , a folder crypto-config is created, and its contents
+#+BEGIN_SRC example
+~/go/src/github.com/hyperledger/fabric-samples/first-network $ tree -L 3 crypto-config
+crypto-config
+├── ordererOrganizations
+│   └── example.com
+│       ├── ca
+│       ├── msp
+│       ├── orderers
+│       ├── tlsca
+│       └── users
+└── peerOrganizations
+    ├── org1.example.com
+    │   ├── ca
+    │   ├── msp
+    │   ├── peers
+    │   ├── tlsca
+    │   └── users
+    └── org2.example.com
+        ├── ca
+        ├── msp
+        ├── peers
+        ├── tlsca
+        └── users
+#+END_SRC
+
+** configtxgen
+
+#+BEGIN_SRC sh :file build.log
+~/go/src/github.com/hyperledger/fabric $ make -w configtxgen
+make: Entering directory `/Users/howardhou/go/src/github.com/hyperledger/fabric'
+build/bin/configtxgen
+CGO_CFLAGS=" " GOBIN=/Users/howardhou/go/src/github.com/hyperledger/fabric/build/bin go install -tags "nopkcs11" -ldflags "-X github.com/hyperledger/fabric/common/configtx/tool/configtxgen/metadata.Version=1.0.1-snapshot-d9c32029" github.com/hyperledger/fabric/common/configtx/tool/configtxgen
+Binary available as build/bin/configtxgen
+make: Leaving directory `/Users/howardhou/go/src/github.com/hyperledger/fabric'
+#+END_SRC 
+
+The execution of this command will read configuration $FABRIC_CFG_PATH/configtx.yaml, which (not only) contains 
+- for orderer
+  #+BEGIN_SRC example
+  Name: OrdererOrg
+  ID: OrdererMSP
+  MSPDir: crypto-config/ordererOrganizations/example.com/msp
+  OrdererType: solo
+  Addresses:
+    - orderer.example.com:7050
+  BatchTimeout: 2s
+  BatchSize: 
+    MaxMessagecount: 10
+    Absolutemaxbytes: 99 MB
+    Preferredmaxbytes: 512 KB
+  Kafka: 
+    Brokers:
+      - 127.0.0.1:9092
+  #+END_SRC
+- for organization
+  #+BEGIN_SRC example
+  Name: Org1MSP
+  ID: Org1MSP
+  MSPDir: crypto-config/peerOrganizations/org1.example.com/msp 
+  AnchorPeers:
+    # AnchorPeers defines the location of peers which can be used
+    # for cross org gossip communication.  Note, this value is only
+    # encoded in the genesis block in the Application section context
+    - Host: peer0.org1.example.com
+      Port: 7051
+  #+END_SRC
+
+"TwoOrgsOrdererGenesis", "TwoOrgsChannel", "Org1MSP", "Org2MSP" are from the configtx.yaml as well.
+
+=configtxgen -profile TwoOrgsOrdererGenesis -outputBlock ./channel-artifacts/genesis.block= , 
+the orderer genesis block, file genesis.block, is created. Folder channel-artifacts is created as well.
+=configtxgen -profile TwoOrgsOrdererGenesis -inspectBlock channel-artifacts/genesis.block > genesis.json= to retrieve genesis.block in format of json.
+
+=configtxgen -profile TwoOrgsChannel -outputCreateChannelTx ./channel-artifacts/channel.tx -channelID myc=, 
+the channel transaction artifact, file channel.tx, is created.
+=configtxgen -profile TwoOrgsChannel -inspectChannelCreateTx channel-artifacts/channel.tx > channel.json= to retrieve channel.tx in format of json.
+
+=configtxgen -profile TwoOrgsChannel -outputAnchorPeersUpdate ./channel-artifacts/Org1MSPanchors.tx -channelID myc -asOrg Org1MSP=, 
+the anchor peer on the channel for Org1, file Org1MSPanchors.tx, is created.
+
+=configtxgen -profile TwoOrgsChannel -outputAnchorPeersUpdate ./channel-artifacts/Org2MSPanchors.tx -channelID myc -asOrg Org2MSP=
+the anchor peer on the channel for Org2, file Org2MSPanchors.tx, is created.
+
+You can retrieve the configuration by commond =configtxgen= with parameter =inspectChannelCreateTx= or =inspectBlock=.
+
+** build orderer image
+#+BEGIN_SRC example :file ordererImageBuilg.log
+~/go/src/github.com/hyperledger/fabric $ make -n -w orderer-docker
+make: Entering directory `/Users/howardhou/go/src/github.com/hyperledger/fabric'
+echo "Building build/docker/bin/orderer"
+mkdir -p build/docker/bin build/docker/orderer/pkg
+docker run -i --rm  -v /Users/howardhou/go/src/github.com/hyperledger/fabric:/opt/gopath/src/github.com/hyperledger/fabric -w /opt/gopath/src/github.com/hyperledger/fabric \
+		-v /Users/howardhou/go/src/github.com/hyperledger/fabric/build/docker/bin:/opt/gopath/bin \
+		-v /Users/howardhou/go/src/github.com/hyperledger/fabric/build/docker/orderer/pkg:/opt/gopath/pkg \
+		hyperledger/fabric-baseimage:x86_64-0.3.1 \
+		go install -ldflags "-X github.com/hyperledger/fabric/common/metadata.Version=1.0.1-snapshot-d9c32029 -X github.com/hyperledger/fabric/common/metadata.BaseVersion=0.3.1 -X github.com/hyperledger/fabric/common/metadata.BaseDockerLabel=org.hyperledger.fabric -X github.com/hyperledger/fabric/common/metadata.DockerNamespace=hyperledger -X github.com/hyperledger/fabric/common/metadata.BaseDockerNamespace=hyperledger -linkmode external -extldflags '-static -lpthread'" github.com/hyperledger/fabric/orderer
+touch build/docker/bin/orderer
+(cd sampleconfig && tar -jc *) > build/sampleconfig.tar.bz2
+mkdir -p build/image/orderer/payload
+cp build/docker/bin/orderer build/sampleconfig.tar.bz2 build/image/orderer/payload
+cat images/orderer/Dockerfile.in \
+		| sed -e 's/_BASE_NS_/hyperledger/g' \
+		| sed -e 's/_NS_/hyperledger/g' \
+		| sed -e 's/_BASE_TAG_/x86_64-0.3.1/g' \
+		| sed -e 's/_TAG_/x86_64-1.0.1-snapshot-d9c32029/g' \
+		> build/image/orderer/Dockerfile
+echo LABEL org.hyperledger.fabric.version=1.0.1-snapshot-d9c32029 \\>>build/image/orderer/Dockerfile
+echo "     " org.hyperledger.fabric.base.version=0.3.1>>build/image/orderer/Dockerfile
+echo "Building docker orderer-image"
+docker build  -t hyperledger/fabric-orderer build/image/orderer
+docker tag hyperledger/fabric-orderer hyperledger/fabric-orderer:x86_64-1.0.1-snapshot-d9c32029
+touch build/image/orderer/.dummy-x86_64-1.0.1-snapshot-d9c32029
+make: Leaving directory `/Users/howardhou/go/src/github.com/hyperledger/fabric'
+
+~/go/src/github.com/hyperledger/fabric $ make orderer-docker 
+Building build/docker/bin/orderer
+Unable to find image 'hyperledger/fabric-baseimage:x86_64-0.3.1' locally
+x86_64-0.3.1: Pulling from hyperledger/fabric-baseimage
+
+Digest: sha256:94471eedd55227294bcd172ac823fef2a3cd3f1e08e0d81b467182f091d26a43
+Status: Downloaded newer image for hyperledger/fabric-baseimage:x86_64-0.3.1
+(cd sampleconfig && tar -jc *) > build/sampleconfig.tar.bz2
+mkdir -p build/image/orderer/payload
+cp build/docker/bin/orderer build/sampleconfig.tar.bz2 build/image/orderer/payload
+Building docker orderer-image
+docker build  -t hyperledger/fabric-orderer build/image/orderer
+Sending build context to Docker daemon  22.35MB
+Step 1/8 : FROM hyperledger/fabric-baseos:x86_64-0.3.1
+x86_64-0.3.1: Pulling from hyperledger/fabric-baseos
+
+Digest: sha256:9194418f49b1d67b443c89185c0949218086f5ab098c0cfcbe0ed7461a56a4c2
+Status: Downloaded newer image for hyperledger/fabric-baseos:x86_64-0.3.1
+ ---> 4b0cab202084
+Step 2/8 : ENV FABRIC_CFG_PATH /etc/hyperledger/fabric
+ ---> Running in 443b7de48c91
+ ---> 470e49ce7ef7
+Removing intermediate container 443b7de48c91
+Step 3/8 : RUN mkdir -p /var/hyperledger/production $FABRIC_CFG_PATH
+ ---> Running in e6875ac2cedc
+ ---> 7997d91b2914
+Removing intermediate container e6875ac2cedc
+Step 4/8 : COPY payload/orderer /usr/local/bin
+ ---> 3827d5f363a8
+Removing intermediate container 9f7a07070d75
+Step 5/8 : ADD payload/sampleconfig.tar.bz2 $FABRIC_CFG_PATH/
+ ---> 15bf36dea4ec
+Removing intermediate container 59dce9e6ba93
+Step 6/8 : EXPOSE 7050
+ ---> Running in c1dffc33491c
+ ---> 507587174169
+Removing intermediate container c1dffc33491c
+Step 7/8 : CMD orderer
+ ---> Running in 9d3f0d0a7ef3
+ ---> 0e1b905eaa61
+Removing intermediate container 9d3f0d0a7ef3
+Step 8/8 : LABEL org.hyperledger.fabric.version 1.0.1-snapshot-d9c32029 org.hyperledger.fabric.base.version 0.3.1
+ ---> Running in 22216eda37e2
+ ---> 772d126f70c6
+Removing intermediate container 22216eda37e2
+Successfully built 772d126f70c6
+Successfully tagged hyperledger/fabric-orderer:latest
+docker tag hyperledger/fabric-orderer hyperledger/fabric-orderer:x86_64-1.0.1-snapshot-d9c32029
+#+END_SRC 
+
+check the image
+#+BEGIN_SRC sh
+~/go/src/github.com/hyperledger/fabric $ docker images
+REPOSITORY                     TAG                              IMAGE ID            CREATED             SIZE
+hyperledger/fabric-orderer     latest                           aaaa879736a2        8 minutes ago       179MB
+hyperledger/fabric-orderer     x86_64-1.0.1-snapshot-d9c32029   aaaa879736a2        8 minutes ago       179MB
+hyperledger/fabric-baseimage   x86_64-0.3.1                     9f2e9ec7c527        2 months ago        1.27GB
+hyperledger/fabric-baseos      x86_64-0.3.1                     4b0cab202084        2 months ago        157MB
+#+END_SRC
+
+** build peer image
+Too much output from =make -n -w peer-docker=.
+
+- build fabric/peer 
+  build/docker/bin, build/docker/peer/pkg
+- cp build/docker/bin/peer build/sampleconfig.tar.bz2 build/image/peer/payload
+- ccenv
+  it relay on build/docker/gotools/bin/protos-gen-go, build/bin/chaintool and build/goshim.tar.bz2.
+  - install fabric/gotools
+    build/docker/gotools/bin, build/docker/gotools/obj
+  - download chaintool into build/bin/chaintool
+  - tar lots of files into build/goshim.tar.bz2
+  - cp build/docker/gotools/bin/protoc-gen-go build/bin/chaintool build/goshim.tar.bz2 build/image/ccenv/payload
+  - docker build  -t hyperledger/fabric-ccenv build/image/ccenv 
+    using build/image/ccenv/Dockerfile as template
+- javaenv
+  relyes on build/javashim.tar.bz2 and build/protos.tar.bz2.
+  - tar lots of files into build/javashim.tar.bz2
+  - tar lots of files into build/protos.tar.bz2 
+  - cp build/javashim.tar.bz2 build/protos.tar.bz2 settings.gradle build/image/javaenv/payload
+  - docker build  -t hyperledger/fabric-javaenv build/image/javaenv
+    using images/javaenv/Dockerfile.in as template
+- docker build  -t hyperledger/fabric-peer build/image/peer
+  using images/peer/Dockerfile.in as template
+
+ccenv image and javaenv image are generated as well.
+
+** build tools image
+It is used by cli.
+
+#+BEGIN_SRC example
+~/go/src/github.com/hyperledger/fabric $ make tools-docker
+Building build/docker/bin/cryptogen
+Building build/docker/bin/configtxgen
+mkdir -p build/image/tools/payload
+cp build/docker/bin/cryptogen build/docker/bin/configtxgen build/docker/bin/peer build/sampleconfig.tar.bz2 build/image/tools/payload
+Building docker tools-image
+docker build  -t hyperledger/fabric-tools build/image/tools
+Sending build context to Docker daemon  52.06MB
+Step 1/8 : FROM hyperledger/fabric-baseimage:x86_64-0.3.1
+ ---> 9f2e9ec7c527
+Step 2/8 : ENV FABRIC_CFG_PATH /etc/hyperledger/fabric
+ ---> Running in a58362b4cabc
+ ---> 5dd1c790f068
+Removing intermediate container a58362b4cabc
+Step 3/8 : VOLUME /etc/hyperledger/fabric
+ ---> Running in 6ec4a543bd92
+ ---> a95df88b8cb3
+Removing intermediate container 6ec4a543bd92
+Step 4/8 : ADD payload/sampleconfig.tar.bz2 $FABRIC_CFG_PATH
+ ---> a038f4a56c77
+Removing intermediate container ae42b4b39d11
+Step 5/8 : COPY payload/cryptogen /usr/local/bin
+ ---> b59f5f4e6f29
+Removing intermediate container 4276a4d8f514
+Step 6/8 : COPY payload/configtxgen /usr/local/bin
+ ---> be97bb19be08
+Removing intermediate container fd6971ba6584
+Step 7/8 : COPY payload/peer /usr/local/bin
+ ---> 99143a374961
+Removing intermediate container 2aa1e64e9b10
+Step 8/8 : LABEL org.hyperledger.fabric.version 1.0.1-snapshot-d9c32029 org.hyperledger.fabric.base.version 0.3.1
+ ---> Running in 24afbf5aa8c6
+ ---> 190ed644249b
+Removing intermediate container 24afbf5aa8c6
+Successfully built 190ed644249b
+Successfully tagged hyperledger/fabric-tools:latest
+docker tag hyperledger/fabric-tools hyperledger/fabric-tools:x86_64-1.0.1-snapshot-d9c32029
+#+END_SRC
+
+** start network
+comment out =command: /bin/bash -c './scripts/script.sh ${CHANNEL_NAME}; sleep $TIMEOUT'= in docker-compose-cli.yaml, because this command line does not give 
+chance to run command mannually, then =CHANNEL_NAME=myc TIMEOUT=60 docker-compose -f docker-compose-cli.yaml up -d=
+
+** container cli 
+docker exec -it cli bash
+
+*** create channel
+peer channel create -o orderer.example.com:7050 -c myc -f ./channel-artifacts/channel.tx --tls $CORE_PEER_TLS_ENABLED --cafile ./crypto/ordererOrganizations/example.com/orderers/orderer.example.com/msp/tlscacerts/tlsca.example.com-cert.pem 
+
+file myc.block is created.
+*** join channel
+peer channel join -b myc.block      ; add peer0 of org1 to myc
+
+CORE_PEER_ADDRESS=peer1.org1.example.com:7051
+peer channel join -b myc.block      ; add peer1 of org1 to myc
+
+CORE_PEER_MSPCONFIGPATH=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/org2.example.com/users/Admin@org2.example.com/msp;
+CORE_PEER_TLS_ROOTCERT_FILE=/opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/tls/ca.crt 
+CORE_PEER_LOCALMSPID=Org2MSP
+CORE_PEER_ADDRESS=peer0.org2.example.com:7051
+peer channel join -b myc.block      ; add peer0 of org2 to myc
+
+CORE_PEER_ADDRESS=peer1.org2.example.com:7051
+peer channel join -b myc.block      ; add peer1 of org2 to myc
+
+*** install chaincode
+peer chaincode install -n chaincode_example02 -v 1.0 -p github.com/hyperledger/fabric/examples/chaincode/go/chaincode_example02 ; the path cannot be the plain path to the chaincode_example02
+
+*** instantiate chaincode
+peer chaincode instantiate -o orderer.example.com:7050 -C myc -n chaincode_example02 -v 1.0 -P "OR('Org1MSP.member','Org2MSP.member')"  -c '{"Args":["init","a","100","b","200"]}' --tls true --cafile  /opt/gopath/src/github.com/hyperledger/fabric/peer/crypto/ordererOrganizations/example.com/orderers/orderer.example.com/msp/tlscacerts/tlsca.example.com-cert.pem
+
+*** qurey by chaincode
+peer chaincode query -C myc -n chaincode_example02 -c '{"Args":["query","a"]}'
+peer chaincode query -C myc -n chaincode_example02 -c '{"Args": ["query", "b"]}'
+
+
