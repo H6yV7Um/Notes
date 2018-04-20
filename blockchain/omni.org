@@ -1,0 +1,368 @@
+
+
+* Omni Protocol
+Omni Layer refers to the Omni Protocol, its Omni core implementation, Omniwallet and other 
+apps in Omni community. MSC(Mastercoin) applies to tokens that access the features of the 
+Omni Protocol clients.
+ 
+omni bases on top of bitcoin without any changes, has new currecy layer with new rules.
+
+Tiny bitcoin transaction can be encoded into the block chain to support and represent 
+transaction in higher protocal layer.
+
+Allow end user to create currency protocol layers, and possible for them to exchange between 
+currencies with no central exchange.
+
+Exodus Address is bitcoin address from which the first Mastercoins were generated during the 
+month of August 2013, and it is 1EXoDusjGwvnjZUyKkxZ4UHEf77z6A5S4P.
+
+Each feature will be unlocked on a certain block once it is deemed stable. 
+Not all features described in this doc are active by default.
+The only exception to this rule is Simple Send message, which has been enabled since Exodus.
+** Embedding Omni Protocol Data in blockchain
+Originally, Omni protocol embeds data in block chain using fake addresses(Class A).
+Later, Omni protocol embed data in bitcoin multi-signature transaction(Class B).
+Last, Omni protocol use the new OP_RETURN opcode (since version 0.9) of bitcoin to make Omni 
+protocol data completely prune-able(Class C) by [[https://bitcoinfoundation.org/blog/?p=290][Gavin Andresen]].
+Class C is most preferred due to the Provable Prune-able Outputs avoiding issues of "bloat" 
+and "pollution" of the block chain. 
+
+Notice, Omni does not make use of bitcoin scripts, because support for it is not guaranteed 
+in future.
+
+** Payment in transaction
+Bitcoin address can be treated as an Omni address. 
+
+An Omni transaction requires that Mastercoins being used must come from An address which 
+holds sufficient bitcoins to create the transaction, otherwise, result in permanent loss 
+of those mastercoins. For that reason, most of bitcoin wallets should be changed to allow 
+user to choose payment address manually.
+
+** Handling blockchain reorg
+Omni Protocol depends on heavily on the order in which transactions appear in the blockchain. 
+Even transactions in the same block can have different meaning or validity depending on the 
+order in which they are recorded. This requires that omni-aware wallets need to detect these 
+reorganization, reparse the affected blocks, change omni protocol balance accordingly. How? 
+initially, parse all transactions starting from the beginning of omni protocol, and keep 
+checkpoints with all relevant omni protocol data so that they can start from the most recent 
+unaffected checkpoint when a reorg event is detected. The most important thing is reorg ARE 
+detected!
+
+** Fee
+omni transactions which have no fees(other than fees charged by the bitcoin protocol layer):
+- All tokens in MSC protocol can be sent (using simple send).
+- Any transaction which directly uses Mastercoins.
+- Creating a property.
+- Property management(changing ownership, issuing new tockens, revoking tokens, etc) 
+
+Transactions which do not meet criteria above pay a flat 0.1% fee, deduced from whatever 
+currency or property is being used(rounded to the nearest representable amount). like, 0.1% 
+of 499 rounds to zero, while 0.1% of 500 rounds to 1.
+Fees are used to autimatically purchase Mastercoin on the distributed exchange, then destroy 
+those Mastercoins.
+
+If a transaction has other percentage-of-total calculations, like distributed exchange 
+liquidity bonus, those calculations are based on the total before any fees are deduced. 
+Example, 0.3% liquidity bonus and 0.1% fee would be calculated from the same total, they 
+do not affect each other.
+
+[[http://blog.mastercoin.org/2014/06/11/mastercoin-is-for-burning/][fee structure]]
+
+** Unlocking features
+- Mastercoin/bitcoin distributed exchange features of block #290630
+- Smart property features of block #297110
+- Managed Token-pool Smart Property features of block #323230
+- Pay-to-script-hash address support of block #322000
+- Send to Owners transaction type of block #342650
+- Savingd wallets and rate-limited wallets of block TBD
+- Data feeds and simple betting of block TBD
+- Contract-for-difference bets of block TBD
+- Distributed e-commerce of block TBD
+- Escrow-backed currencies of block TBD
+
+** Transaction versioning
+** Transaction Field Defination
+** Transaction Definitions
+Up version 0.3.5 of this spec, Transaction type is 4 byte of length, and only 17 transactions 
+identified.
+Starting from 0.4 of this spec, each transaction definition has its own version number. In 
+each transcaction message, the transaction type field takes 2 bytes, the version number 
+(2 bytes) is put in the first field. 
+In conclusion, if the first 2 bytes of the message is zero, parse the message in format of 
+0.3.5 of this spec. if the first 2 byte is at least 1, parse the message in the format 
+associated with that version number.
+
+*** Transfer Coins
+**** Simple Send (Transaction type 0)
+Invalid transaction 
+- sending address has zero coins in its available balance of that currency
+- the amount to transfer exceeds the number owned and available by sending address
+- specified currency identifier is non-exist
+- the specified currency identifier is 0 (bitcoin)
+- other validity constraints 
+
+It will destroy the coins in question if the receiver address is non-existent, just like 
+bitocin.
+
+There is a time window for sender to undo a transaction if sender address is marked as Saving.
+
+**** Send To Owners (Transaction type 3)
+transfer specified currency except bitcoin from an address to the current owners of the currency.
+
+The current owners are all the addresses, excluding the senders address, that have a non-zero 
+balance of the specified currency when the transaction message is processed. The Amount to 
+transfer must be divided proportionally among the current owners based upon each owner's 
+current available balance plus reserved amount, exluding the amount owned by sender.
+
+The sending address must be charged a transfer fee for each receiver address.
+
+Invalid transaction 
+- sending address has zero coins in its available balance of that currency
+- the amount to transfer exceeds the number owned and available by sending address
+- specified currency identifier is non-exist
+- the specified currency identifier is 0 (bitcoin)
+- sending address does not have sufficient available balance to pay transfer fees.
+- sending address owns all the coins of that currency.
+- other validity constraints 
+
+To comply with the precision for representing quantities of that coin, it is necessary to 
+round up/down the number of coins deserved by an address, and, to reward the owners 
+of larger holder, it will round up the number of coins they deserve, and that process start 
+from largest holder, then next largest holder, and so on until no more ocins to be 
+distributed, for those deserve same number of coins, the order to take their coins is in 
+alphabetical order by addresses.
+ 
+**** TODO Distributed Exchange 
+trade different coins without trusting a centralized website.
+
+***** Sell Mastercoins for Bitcoins (Transaction Type 20)
+***** Purchase Mastercoins with Bitocins (Transaction Type 22)
+***** Sell Omni protocol coins for another omni protocol coins (Transaction Type 21)
+*** Smart Property
+Just like Omni protocol currencies, Property tokens can be bought, sold, transfered, and used 
+for betting.
+
+Currency identifier is given in the order in which they are created, bitcoin is 0.
+- valid currency identifier for real MSC(1)
+  1 and 3 to 0x7fffffff, 1 is for Mastercoin
+- valid currency identifier for Test MSC(2) 
+  Test MSC property IDs also start from 3, but with the most significant bit set to 
+  distinguish from real MSC properties.
+  2 and 0x80000003 to 0xffffffff, 2 for Test Mastercoin
+
+Each property has a property type, which defines whether it is divisible, whether it 
+replaces or appends a previous property. All omni protocol coins, if it is divisible, have 
+the same precision as bitcoins, that is eight decimal places. Example, to create 1,000 units 
+of a divisible currency, specify Number of Property 100, 000, 000, 000. to create 1,000 
+uinits of indivisible property, specify Number of Property 1,000.
+
+The attriutes of an existing property cannot be changed, however, it allows the address that 
+issued the property to replace or append it with a new property. The replaced property can 
+still be used and traded as normal, but UI should notify users to switch to the new one by 
+- set previous property ID to that property's id
+- ser number properties to zero, and 
+- use one of the replace values for Property Type(see Transaction Type 50 and 51)
+
+Appended properties must not be treated as the same asset in UI or protocol parser.
+
+A property can be replaced and appended multiple times, even abandoning and un-abandoning it
+more than once.  
+
+Omni protocol allows users to spend Mastercoins to promote a smart property. By default, the 
+order UI display smart properties base on how many Mastercoin spent for promotion and how 
+long ago Mastercoin spent for promotion.
+
+All property creation transaction types(i.e. 50, 51, 54) can be restricted such that only a 
+soecified list of addresses can use the resulting property coins. How? simply ser the reference 
+address to be the address which created the list of approved addresses. addresses which are 
+removed from the approved list can still send their restricted coins to another approved 
+address using Simple Send, no other transaction they can do.
+
+**** New Property Creation with Fixed number of Coins (Transaction Type 50)
+once property has been created, the coins are owned by the address which broadcast the message 
+creating the property.
+
+For a transaction to be valid,
+- Previous Property ID must be 0 when Property Type indicates a new property.
+- Previous Property ID must be a currency ID created by the address when Property Type 
+  indicates a property is being replaced or appended.
+- Property Name must not be blank or null
+
+**** TODO New Property Creation via Crowdsale with variable number of Coins (Transaction Type 51)
+Effective with version 1 of Transaction type 51 and block #(TBD).
+
+**** TODO New Property with Managed Number of Coins (Transaction Type 54)
+Coins pool is actively managed by the address that create the property.
+**** Smart Property Administration 
+Administrative action are permitted only by the issuer on Record which is the address which 
+originally broadcast the transaction that reserved the currency ID of the property until 
+explicitly changed. 
+
+Implicit issuer on Record are created by Transaction Type 50, 51 and 54.
+
+***** TODO change Issuer on Record for a Smar Property
+**** TODO Future Transactions
+Creating a List of Addresses
+
+Removing Addresses from a List
+
+Transactions to Limit Funds
+
+Data Streams and Betting
+
+Distributed E-Commerce
+
+
+
+** Appendix A
+Ways to store Omni transaction data in Bitcoin blockchain.
+
+Omni software should support decoding of both Class A and Class B, but only support encoding 
+of Class B.
+*** Class A 
+Deprecated, just for backwards compatibility.
+
+Utilize fake Bitcoin addresses to encode transaction data. 
+Class A transactions are restricted to 'simple send' transaction type only.
+
+Requirements,
+- has a P2PKH or P2SH input with a valid signature to designate sending address
+- has an output for recipient address (or the reference address)
+- has an output for ecoded fake address (the 'data' address)
+- all outputs should have values above the 'dust' threshold
+- Has exactly two non-Exodus outputs(one of which must be the data address) with a value equal 
+  to the Exodus output and/or has exactly one output with a sequence number +1 of data address 
+  for reference output identification
+- Additional outputs are permitted for the remainder of the input('change' address)
+
+Further,
+- P2SH
+  - enabled since block #322000
+  - as an apaque script-hash can not be decoded into addesses
+- invalid P2PKH or P2SH trigger invalidation of the transaction
+- Exodus outpus are ignored in decoding
+
+Since no private key associated with these faked addresses, they are unspendable, and bloat 
+UTXO set which resides in memory. 
+
+NOT COMPLETE.
+*** Class B
+Class B is for all transaction types, including 'simple send' transaction.
+
+Class B addreses UTXO bloat issue by utilizing '1-of-n' multisignature outputs where one of 
+the signators is the sender or another public key address the sender has designated.
+
+Maximum value for n is 3 currently, and one signator should be the sender for redemption 
+purpose, there is limit of 2 data packets per output. 
+A number of multisig outputs can be combined to increase the space for a transaction. On 
+decoding from all multisig outputs, evaluate each of them according to their sequence number.
+
+NOT COMPLETE.
+** Appendix E
+In addition to transaction fee, however, there are costs associated with the outputs used to 
+store transaction data, and these costs must be considered to reach a total cost to the end 
+user for broadcasting a given Omni Protocol message.
+
+Perceived cost to end uer, assuming that dust threshold is 0.00006BTC,
+- Class A (Total: 0.00028BTC)
+  - Exodus Address output: 0.00006
+  - Reference Address output: 0.00006
+  - Data Address output: 0.00006
+  - Bitcoin transaction fee: 0.0001
+- Class B (Total: 0.00034BTC)
+  - Exodus Address output: 0.00006
+  - Reference Address output: 0.00006
+  - Per multiSig Output: 0.00006
+  - Bitcoin transaction fee: 0.0001
+
+These costs in outputs are redeemable by other transactions, but an exception is Class A 
+data address.
+- Class A 
+  - The foundation (by controlling Exodus address) may redeem the Exodus output
+  - The Reference address may redeem the Reference output
+- Class B
+  - The foundation (by controlling Exodus address) may redeem the Exodus output
+  - The Reference address may redeem the Reference output
+  - The sending address may redeem the Multisig output(s)
+
+* Omni core v0.0.10
+It is a Major Relase, upgrade is mandatory.
+
+It can be used as replacement for Bitcoin Core, and switching betwen Omni Core and Bitcoin Core 
+is fully supported at any time.
+
+It bases on Bitcoin Core 0.10. Header-First sync is supported in Bitcoin Core 0.10, and blocks 
+are downloaded in parallel, no longer stored in order on disk.
+
+=estimatefee nblocks=, fee-per-kb needed for a tx to begin comfirmation within nblocks.
+=estimateprioity nblocks=, priority needed for a zero-fee tx to begin confirmation within nblocks.
+
+** Class C
+No details about Class C in Spec.
+
+Infor below learned from Google Forum.
+
+With the default configuration, if payload is sufficient small, Omni core will create Class 
+C transactions, otherwise, fall back to create Class B transactions. Class C has positive 
+transaction costs and fees.
+
+Do not need to send an output to the Exodus address any more, instead bytes =0x6f6d6e69= 
+("omni") are prefixed to the data payload to provide marker identification.
+
+[[https://github.com/OmniLayer/omnicore/issues/383][From Questions related to Class C]], 
+- only the first VIN is considered the sender 
+- other VINs except the first one can be from any other addresses to pay fees
+- A small amount BTC (over dust threshold) is send to receiver address for recipient identification
+
+* JSON-RPC API
+Port remais =8332= by default. 
+** omni_send 
+
+** omni_getbalance
+parameters
+- address(string, required) 
+- propertyid(number, required)
+
+** omni_getallbalanceforaddress
+parameters
+- address(string, required) 
+
+
+** omni_gettransaction
+
+** omni_listtransactions
+
+** omni_listblocktransactions
+
+** omni_listpendingtransactions
+
+** omni_getproperty
+
+** omni_getactivations
+
+** omni_getpayload
+
+** raw transaction 
+*** omni_createpayload_simplesend
+
+*** omni_createrawtx_input
+
+*** omni_createrawtx_opreturn
+
+*** omni_createrawtx_multisig
+
+
+*** omni_createrawtx_refernece
+
+*** omni_createrawtx_change
+change output should be inserted before reference outpouts. 
+
+change output should be added to the first position.
+
+
+*** omni_sendrawtx
+
+
+*** omni_decodetransaction
+
+** Fee 

@@ -1,0 +1,4 @@
+
+gRPC基于http2，采用Protocol Buffers定义服务（Protocol Buffers支持数据序列化），多语言支持，
+提供简单的方法用于精确的定义服务，且为客户端和服务端自动生成功能库。
+

@@ -1,0 +1,296 @@
+
+
+关键字：
+- 基本类型
+  bool, true, false, string, rune, (u)int8(16,32,64), float64, nil。
+  nil 是引用类型(slice, map, chan) 及 指针类型的零值。
+- 内建函数 
+  append, cap, len, close, copy, delete, panic, recover, complex, real, image.
+- 包相关
+  import, package
+- 实体声明
+  map, chan, struct, const, var, func, interface, type
+- 流程控制
+  if, else, switch, case, fallthrough, default, for, break, continue, goto, range, defer, go, 
+  select, return
+
+除 << 和 >> 外的其他算术操作符都只能对两个类型完全相同的数值类型的操作数进行操作，但是，只要其中有
+一个操作数是字面量，就不存在这种约束，会自动隐式转换（golang自动隐式转换不多见）。
+
+内建make函数只能用于创建切片类型、字典类型、通道类型的值，并返回一个已初始化（非零值）的对应数据类型的值。
+
+内建的new函数不能用于创建引用类型的值。
+
+关键字const用于创建常量。常量的赋值必须与创建同时进行，以后不可更改。
+#+BEGIN_SRC go
+const untypeConstant = 10.0 // 无类型常量
+const typeConstant := 10.0 // 有类型常量
+#+END_SRC
+
+关键字iota代表整数，每当出现在以const开始声明的语句中时，代表0，之后，每换一行其值加一。
+
+关键字var用于变量声明。
+
+全局变量不能使用操作符 := 赋值。使用 := 的赋值语句中，左边至少有一个在当前上下文未定义的新变量，
+标识符-不代表新变量。
+
+* 指针
+指针的零值是 nil 。
+
+若值 p 为 nil, 则 *p 会panic。
+
+* 数组
+数组的零值是，数组中每个元素都是相应类型的零值，数组的长度(内建函数 len 获取)仍是数组初始化的长度。
+
+=[3]string{"12", "23", "sdf"}= 这是数组的定义；=[]string{"12", "23", "asd"}= 这是切片的定义。
+
+* 切片
+切片属于引用类型，其零值是 nil，零值上应用内建函数 len 将会得到 0 。
+
+=[3]string{"12", "23", "sdf"}= 这是数组的定义；=[]string{"12", "23", "asd"}= 这是切片的定义。
+
+可以对值为 nil 的切片调用内建的 append。 例如
+#+BEGIN_SRC go
+a := [2]uint{1,4}
+var s []uint
+s = append(s, a[:]...)
+#+END_SRC
+
+在创建新切片时，若未指定新切片的容量，则其容量为被操作对象的容量与表达式中指出的被操作对象的起始
+索引值的差值。例如，
+#+BEGIN_SRC go
+a := [10]uint{0,1,2,3,4,5,6,7,8,9}
+// 对s1, s2, s3的修改都会反映到被引用的数据a
+s1 := a[2:6] // cap(s1) will be 8 (cap(a)-2)
+s2 := a[2:6:6] // cap(s2) will be 4
+s3 := a[2:6:5] // error invalid slice index: 6 > 5
+
+内建make函数创建切片 =s := make([]int, 10, 100)= ，则 len(s) 为10， cap(s)为100。
+#+END_SRC
+* 字典
+字典是引用类型，其零值是 nil 。
+
+内建函数 delete 一个值为 nil 的字典值，或一个在指定字典中不存在的索引，既不会编译错误，也不会 panic。
+
+字典值不是并发安全的。
+* 自定义类型
+结构体(struct)类型属于值类型，非引用类型。
+
+#+BEGIN_SRC go
+// 隐含名称分别是 T1, T2, T3, T4
+type Anonymous struct {
+    T1
+    *T2
+    P.T3
+    *P.T4
+}
+#+END_SRC
+
+匿名字段的隐含名称不能与所属结构体类型中的其他字段重名。
+
+自定义类型可以直接调用被嵌入类型的方法。
+
+嵌入类型的方法或字段会被被嵌入类型的同名方法或字段隐藏，与参数无关，且字段可以隐藏方法，方法也
+可以隐藏字段。较浅层次的嵌入类型的方法或字段， 也可以隐藏较深层次的嵌入方法或字段。同一层次两个
+不同的嵌入类型有同名的方法或字段时，编译错误。
+
+被隐藏的嵌入类型的方法，可通过链式调用的方法访问。示例
+#+BEGIN_SRC go
+type Sequence struct {
+    Sortable
+    sorted bool
+}
+
+func (self *Sequence) Sort() {
+    self.Sortable.Sort() // 被被嵌入类型隐藏的嵌入累心的同名方法的访问
+    self.sorted = true
+}
+#+END_SRC
+
+假设有结构体类型S和非指针类型的数据类型T， 则
+- 若在S中包含嵌入类型T, 那么
+  - 在S的方法集合中会包含T的方法
+  - 在*S的方法集合中会包含T的方法， 也会包含*T的方法
+- 若在S中包含嵌入类型*T, 那么
+  - 在S的方法集合中会包含T的方法，也会包含*T的方法
+  - 在*S的方法集合中会包含T的方法， 也会包含*T的方法
+
+在一个结构体类型的别名类型（也是通过关键字 type 定义）上，不能调用原结构体类型的值方法与指针方法。
+* 通道
+通道是引用类型，其零值是 nil 。
+
+通道类型的值只能用内建的make函数创建。
+
+试图从一个值为 nil 的通道接收数据，将永远被阻塞。试图往一个值为 nil 的通道发送数据，将永远被阻塞。
+
+从一个已被关闭的通道接收值，在将关闭前发送的数据接收完之后，会一直接收到相应的零值，但接收的第二个
+返回值（通道接收可有两个返回值）会指出 false 。往一个已关闭的通道发送数据，将会 panic。
+
+关闭一个仅用于接收的通道，将会编译错误。
+* 相等性
+对两个不具有可比性的值做判断时，会编译错误。
+对两个具有相同接口类型的值做比较时，若它们是的动态类型不具有可比性就会 panic。
+
+切片类型、字典类型、函数类型都不具有可比性，但它们都能与nil比较。
+
+类型相等是值相等的前提。
+
+别名类型和源类型是不同的类型。
+
+命名类型和匿名类型总是不等的。
+
+位于不同包中两个数据类型总是不想等的。
+
+只有数组长度相同，且元素的数据类型相同，两个数组类型才是相等的。
+只有当数组类型是相等的，且数组的元素具有可比性时，数组的值才有可比性。
+
+只要元素的数据类型恒等，则两个切片的类型恒等。
+切片类型的值不具有可比性。
+
+若有相等的键类型及元素类型，则两个字典类型是相等的。
+
+对于两个结构体类型，若它们的字段声明能够一一对应（相同的名称，相同的数据类型），那这两个结构体类型
+是相等的。 标签也应作为判断结构体类型相等的依据。相同类型的两个结构体的值，若它们的每个字段都相等，
+则这两个结构体值就相等。
+
+若有相等的元素类型且方向相同，则两个通道类型是相等的。
+通道类型相等，切缓冲区大小相等，则两个通道类型的值相等。值都是 nil 的两个通道类型的值相等。
+
+对于两个函数，只要他们的参数及结果能够一-对应（相同的类型，非名称），则两个函数的类型是相等的。可
+变长参数不等于切片参数。
+
+只要有相同的方法集合，则两个接口类型是相等的。与方法申明的顺序无关。与方法名有关。
+两个接口类型值，只有拥有相等的动态类型和相同的动态值，它们才可以被判定为相等。
+若两个接口类型的值都是空值，那它们也是相等的。
+
+非接口类型X的值x可以与接口类型T的值t判断相等，当且仅当，接口类型T具有可比性且类型X是接口类型T的
+实现，若值t的动态类型与类型X相等且值t的动态值与值x相等，则值t与值x相等。
+
+* 流程控制
+switch case 中的 case 后面可跟多个表达式，它们之间用逗号分隔。不会自动 fallthrough，但提供了 
+fallthrough 关键字。
+
+switch 语句的另一种用法-类型switch，须与关键字 type 配合，不支持 fallthrough。示例
+#+BEGIN_SRC go
+switch i := v.(type) { // 
+case string:
+    fmt.Printf("%s\n",s)
+case int, uint, int8, uint8, int16, uint16, int32, uint32, int64, uint64:
+    fmt.Printf("%d\n", i)
+default:
+    fmt.Printf("Unknown value. (type=%T)\n", i)
+}
+#+END_SRC
+
+for 语句既可以如传统 for 语句一般使用。也可以如传统 while 语句一般使用。还可以接一个 range 语句，
+从而迭代数组、切片、字典中的键值对。还可以接 range 语句，持续地从一个通道中接收数据，直到该通道
+关闭，若果通道值是 nil， 则 range 语句永久被阻塞。
+
+label的使用比较特殊，例子
+#+BEGIN_SRC go
+out: // result is: 0, 1, 2, 3
+    for i:=0; i<5; i++ {
+        fmt.Println(i)
+        if i == 3 {
+            break out
+        }
+    }
+
+cont: // result is: 0, 1, 2, 3, 4
+    for i:=0; i<5; i++ {
+        fmt.Println(i)
+        if i == 3 {
+            continue cont
+        }
+    }
+#+END_SRC
+
+不带label的break不能用在select中。带label的break可以用在select中。label必须紧挨着for/switch/select。
+
+* 函数
+函数类型的零值是 nil 。
+
+形如 ...T, 函数的可变长参数，必须是函数的最有一个形参，可用内建函数 len 获取其个数，其个数可能为
+0。数组形式的实参 a 需 a[:]...， 即先转换为切片，再将切片展开。
+
+函数返回结果被命名时，返回结果必须使用括号，该结果变量会被自动初始化为相应的零值，return 返回时，
+可以不指定返回值，自动将返回结果中声明的变量的当前值。
+
+方法与其所属的数据类型必须位于同一个包。
+
+自定义数据类型的方法集中，仅包含与它关联的所有值方法。而与其相应的指针类型的方法集中，却包含所有的
+值方法和指针方法。
+
+在引用类型的别名类型(如 =type sss []uint=)的值方法中对该调用者值的改变，会直接改变调用者的值本身。
+
+
+** defer
+defer 语句用于注册延迟函数，只能出现在函数或方法内部，在函数结束(return, panic)时，延迟函数被自动
+执行。函数或方法结束时，其内部的多个通过 defer 语句注册的延迟函数会被逆序执行。 
+
+可修改函数的返回值, 方法如下。
+#+BEGIN_SRC go
+func serv() (b bool) {
+    defer func() {
+        b = true
+    }()
+    return 
+}
+#+END_SRC
+
+注意，以下代码的defer不能修改返回值。
+#+BEGIN_SRC go
+func serv() bool {
+    var b bool
+    defer func() {
+        b = true
+    }()
+    return b
+}
+#+END_SRC 
+
+defer 语句被执行时，传递给延迟函数的参数以通常的方式被求值，但延迟函数内部的变量不会被求值。
+以下示例中， 变量 i 的求值时机是不同的。
+#+BEGIN_SRC go
+defer fmt.Printf("%d\n", i) // 立即求值 i, 但打印是在函数结束时
+
+defer func() {
+    fmt.Printf("%d\n", i) // i 不会被求值，直到defer所在的函数结束时
+}()
+#+END_SRC
+* 接口
+接口可以嵌入另一个接口，但不能嵌入自身。
+
+当前接口中声明的方法，也不能与任何被嵌入其中的接口类型的方法重名，否则，编译错误。
+
+* time 
+若定时器还未超时时，调用 time.Stop() ，则该定时通道的接收者永远被阻塞。
+如果确定定时器已超时了，也不必调用 time.Stop()。因此，time.Stop() 无用。
+#+BEGIN_SRC go
+timer := time.NewTimer(5 * time.Second)
+go func() {
+    <-timer.C
+    fmt.Println("expiration")
+}()
+timer.Stop()
+time.Sleep(1 * time.Minute)
+#+END_SRC
+
+应该使用 time.Reset()。 若返回 true, 则其改变了未超时的定时器的超时时间，从而该定时器只会超时
+一次；若返回 false, 则其重新启动了该定时器，因为原来的定时器已超时，所以，该定时器会超时两次。
+#+BEGIN_SRC go
+timer := time.NewTimer(1 * time.Second) // 5 * time.Second
+go func() {
+    <-timer.C
+    fmt.Println("expiration")
+}()
+time.Sleep(5 * time.Second) // 1 * time.Second
+if timer.Reset(0 * time.Second) {
+   // <-timer.C  panic when original time has not expired
+} else {
+    <-timer.C
+}
+time.Sleep(1 * time.Minute)
+#+END_SRC
+* 包
+类似于 =import _ "runtim/cgo"=，导入者无法调用被导入者的任何实体，常用于执行被导入者的初始化函数。

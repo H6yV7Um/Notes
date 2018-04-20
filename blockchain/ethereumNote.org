@@ -25,7 +25,7 @@ changes:
 	BTW, cost for creating contract via another contract remains 32000.
   - transaction signatures whose s-value is greater than =secp256k1n/2= are now considered 
     invalid
-  - if contract creation does not hace enough gas to pay for the final gas fee for adding the 
+  - if contract creation does not have enough gas to pay for the final gas fee for adding the 
 	contract code to the state, the contract creation fails rather than leaving an empty 
     contract.
   - change the difficulty adjustment algorithm.
@@ -165,7 +165,103 @@ The most common reasons that a node cannot get connected are:
 - local time of the node might be incorrect, even 12 seconds too fast can be lead to 0 peers.
 - firewall could prevent UDP traffic.
 
+** Mining
+Ethereum is in many ways similar to the bitcoin blockchain. Consensus is based on choosing 
+the block with the highest total difficulty. Miner produce blocks which the others check 
+for validity.
 
+Unlike bitcoin, ethereum contains a copy of both the transaction list and the most recent 
+state. Unlike, ethereum store the block number and the difficulty in block.
+
+Ethash PoW used in Homestead, PoS will be used in Serenity. Ethash PoW is memory hard making 
+it ASIC resistant. Memory hardness is achieved with Ethash PoW that requires randomly 
+choosing subset of a fixed resource(called DAG(directed a cyclic graph)) dependend on the 
+nonce and block header, please refer to [[https://www.vijaypradeep.com/blog/2017-04-28-ethereums-memory-hardness-explained/][Memory hardness explained]]. The DAG is totally 
+different every 30000 blocks, a 125-window called *epoch*(roughly 2.5 days). It takes a while 
+to generate DAG. Since DAG only depends on block height, it can be pregenerated. DAG is not 
+needed for verifying PoW.
+
+Block difficulty is adjusted dynamically in order to produce a 12 second blocktime. Faster 
+block producing, less security, in order to offset security lose, ethereum takes Uncles 
+hashing power into account.  
+
+Any miner can get revenue from mining which is directly proportional to its mining power or 
+hashrate, i.e., the number of nonces tried per sec normalised by the total hashrate of the 
+network.
+ 
+The successful PoW miner of the winning block receives:
+- static block reward, consisting of exactly 5.0 Ether
+- gas cost expended within the block 
+  amount of ether that depends on the current gas price
+- extra reward for refering uncles
+  2 uncles, at most, could be refered by a block.
+  每引用一个uncle，成功挖矿的矿工可获得 (5.0 ETH * 1/32) 
+
+Uncle is stale block whose parent is one of ancestors (max 6 blocks back) of the parent of 
+the including block(uncle 必须是区块的前2层到前7层的直接子块). In order to neutralise the 
+effect of network lag, uncles included in a block produced by the successful PoW miner 
+receive 7/8 of the static block reward, that is GHOST protocol.   
+
+Ethash PoW is designed to hash a fast verifiability time within a slow CPU-only enviroment, 
+yet provide vast speed-ups for mining when provided with a large amount of memory with 
+high-bandwidth. 
+ 
+** Contracts and Transactions
+Contract accout has an ether balance as well. 
+
+Contract code execution is triggered by transactions or messages(calls) received from other 
+contracts.
+
+Every time a contract receives a transaction, its code is executed as instructed by the 
+*input* parameters sent as part of transaction. Contract code is executed by EVM on each node 
+participating in the network as part of their verification of new blocks.
+
+Message is produced by a contract and not an exteral actor. the *CALL* or *DELEGATECALL* 
+opcodes produce and execute a message. Like a transaction, a message leads to the receipt 
+account running its code.  Message is virtual object that is never serialized. 
+A message contains 
+- the sender (implicit)
+- the receipt
+- value field, that is the amount of Wei
+- data field(optional), that is the actual input data to contract
+- startgas value, which limits the max amount of gas the code execution triggered by the 
+  message can incur
+ 
+Gas and Ether are decoupled deliberately. For a executed operation, its Gas Cost is 
+constant. Gas price in Ether is decided by miners who can refuse to process a transaction 
+with lower gas price. To get Gas, you simply need to add Ether to your account, it will 
+purchase gas automatically in the amount you specify as max expenditure for the transaction.
+
+If the total gas exceeds the gas limit, then all changes are reverted, except the 
+transaction is still valid and the fee can still be collected by the miner. All excess gas 
+not used by the transaction execution is reimbursed to the sender as Ether.  
+
+Interaction with a contract is typically done using an abstractionl layer, such as 
+=eth.contract()= which returns a javascript object with all of the contract functions available 
+as callable functions in javascript. The standard way to describe the available functions of 
+a contract is the ABI defination, which describes the call signature and retuen values. all 
+the function calls specified in the ABI are made available on the contract instance, and you 
+can call them in one of two ways.
+#+BEGIN_SRC go 
+var Multiply7 = eth.contract(contract.info.abiDefinition)
+var myMultiply7 = Multiply7.at(address) 
+
+myMultiply7.multiply.sendTransaction(3, {from: address}) // (1) or 
+myMultiply7.multiply.call(3) // (2)
+#+END_SRC
+way (1), send a transaction, cost ether, return hash of the transaction,  and the call will 
+be recorded forever on the blockchain. way (2) executed locally in EVM, not modify the 
+internal state of the contract, not recorded in blockchain, not cost ether, return the value 
+returned by the function.
+
+Contract registry is achieved by 2 steps. The 1st step register the contract code(hash) with 
+a content(document info) hash in the contract =HashReg=. The 2nd step register a url 
+with the content hash in the =UrlHint= contract. conclusion, you can find content hash by 
+contract code hash, furthermore, find the url to document info by the content hash. Contract 
+authors are encouraged to make document info by register it on blockchain or thtough a third 
+party service, such as EtherChain.
+
+Web3.js is a javascript lib that works on top of the Ethereum RPC interface.
 * Inside a Transaction
 [[https://medium.com/@codetractio/inside-an-ethereum-transaction-fa94ffca912f][Inside an Ethereum Transaction]] 
 
@@ -196,7 +292,7 @@ personal.unlockAccount("0xa1f522f56fafbaa705f4edb59169e51e7fd6859e", "password",
 
 # returns tx hash
 eth.sendTransaction({from:"0xa1f522f56fafbaa705f4edb59169e51e7fd6859e",
-      to:eth.accounts[1],value:2000000000000,
+      to:eth.accounts[1], value:2000000000000,
       nonce:eth.getTransactionCount("0xa1f522f56fafbaa705f4edb59169e51e7fd6859e")})
 
 # return tx details, like blocknumber, blockhash, transactionIndex, hash, from, to, 
@@ -306,3 +402,113 @@ Note,
 ** contract creation
 Contract can be created with =eth.sendTransaction=, *to* should be omitted, *data* should be 
 the code.
+* Code
+** Data structure
+*** RLP
+RLP(Recursive Length Prefix) is an Encoding/Decoding algorithm that helps Ethereum to 
+serialize data and possible to reconstruct them quickly.
+
+Encoding
+- if input is single byte in [0x00, 0x7f]
+  itself is RLP encoding
+- if input is non-value
+  like uint(0), []byte{}, string(""), RLP encoding is 0x80
+- if length of string is 2-55 bytes long
+  Encoding consists of 
+  - a single byte with value of 0x80 plus the length of string 
+  - array of character in string in hex
+- if string length is more than 55 bytes
+  Encoding consists of 
+  - a single byte with value of 0xb7 plus the length of the second part below
+  - second part caontains length of string
+  - array of character in string in hex
+- if empty array, RLP encoding is 0xc0
+- if length of list is 0-55 bytes
+  Encoding consists of
+  - single byte with valud 0xc0 plus length of list
+  - encodings of items in list
+- if list length is more than 55 bytes
+  Encoding consists of
+  - a single byte with value of 0xf7 plus the length of the second part below
+  - second part caontains length of list
+  - encodings of items in list
+
+Conclusion 
+- [0x00, 0x7f]: byte
+- [0x80, 0xbf]: string
+- [0xc0, 0xff]: list
+
+*** HP (Hex-Prefix)
+Another encoding used by Ethereum, also called Compact Encoding.
+
+RLP is used for encoding/decoding Value, and HP encoding is used for encoding/decoding Path.
+
+Leaf and extension are 2 kinds of node, however path of leaf has terminator and extension 
+does not. Terminator is the last byte of the path and has value of 16.
+
+*** Radix Trie and Merkle Trie
+Ethereum mix Radix Trie and Merkle Trie to create Patricia Trie.
+
+Radix trie is used to optimize for searching. The key is the path to reach the value.
+The path from one node to one of its directly connected child is represented by a ASCII 
+character. If the value of some intermediate nodes in the path is null, a string involves 
+these intermediate paths is used to improve the searching.
+
+*** Merkle Trie
+Merkle Tire is used to authenticate data.
+
+*** Patricia Tire
+A node is stored as key-value. 
+
+*Value* is an array with 17 elements. First 16 elements are indexed by hex number from 0 to 
+f, *Path* consists of them is used for "trie lookup". Last one is data contained by that node. 
+
+*Key* is hash of the value, is used for "database lookup".
+
+*Leaf* node and *extension* node are in form of an array with 2 elements, the first element 
+is *partialPath* that helps to reduce empty-value node, the second one contains value that is 
+data if *leaf* or merkleHash if *extension*.
+
+*PatialPath* is HP encoded. Every elements in a node is RLP encoded. Value is RLP encoded.
+
+In Ethereum, Patricia is used in 4 trie:
+- stateRoot
+  contained in block header.
+- storageRoot
+  sub-trie, contained in data of state trie.
+- transactionRoot
+  contained in block header.
+- receiptRoot
+  contained in block header.
+
+* Raiden Network
+AN off-chain scaling solution for performing ERC20 token transfer.
+
+Achieved by hash-locked transfer(called balance proofs), and collateralized by previously 
+setup on-chian deposits(called payment channel technology). Payment channel allows unlimited, 
+bidirectional transfers as long as the net sum of their transfers does not exceed the deposited 
+tokens. These transfers do not involve the actual blockchain itself, except for an initial 
+on-chain creation and an eventual closing of the channel.
+
+Signature makes neither party can back out of any of the value transfers contained therein, as 
+long as at least one of the party decides to present it to the blockchain.
+
+The network and its protocol for routing and interlocking these transfers is called Raiden 
+Network. Because of Raiden Network, you do not need to create a new payment channel, 
+as long as there exists one route in Raiden Network that connects you and counterpart, and 
+intermediares within Raiden Network will charge fees on a low percentage basis for providing 
+their own channels to the network.
+
+Since each channel has two participants, it always maintains two Balance Proofs, multiple 
+transfers just rebalance the two Balance Proofs. Finally, one party decides to settle the 
+balance on the blockchain, he can close the channel by presenting his balance proof to smart 
+contract. The counterparty must 
+- present his balance proof 
+  Now, they can withdraw their deposits.
+- OR, do nothing if he receive no transfers
+  Balance will be distributed according to the closing participant's proof.
+
+
+
+ 
+
